@@ -32,8 +32,8 @@ invalid values fail before a request is sent.
 
 Correctness and recovery regressions are reported before metrics. Token, cache,
 latency, first-edit, tool-call, peak-context, and CLI-RSS distributions are
-reported per task and condition; missing metrics remain absent. A report explicitly makes
-no performance or equivalence claim. Cache metrics require adapter-supplied
+reported per task and condition; missing metrics remain absent. A report
+explicitly makes no performance or equivalence claim. Cache metrics require adapter-supplied
 measurements and units/denominators before interpretation.
 
 Both adapters have deterministic loopback-provider tests for observed token
