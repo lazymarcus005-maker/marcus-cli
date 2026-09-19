@@ -19,9 +19,12 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - name: Install ripgrep
+      - name: Install ripgrep (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes ripgrep
+      - name: Install ripgrep (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ripgrep
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
