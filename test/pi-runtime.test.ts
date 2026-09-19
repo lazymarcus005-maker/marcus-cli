@@ -655,8 +655,8 @@ describe("Pi adapter with a deterministic local provider", () => {
     try {
       await kernel.start();
       store.createSession({ sessionId: kernel.sessionId!, worktreeRoot: root, gitDirectory: null });
-      store.prepareExecution({ executionId: "unresolved-write", sessionId: kernel.sessionId!, redactedInput: { path: "src/file" }, effectClass: "workspace-write" });
-      store.recordExecutionEvent("unresolved-write", "unknown", { reason: "crash after launch; side effect uncertain" });
+      store.prepareExecution({ executionId: "unresolved-write", sessionId: kernel.sessionId!, redactedInput: { command: "git push origin main" }, effectClass: "external" });
+      store.recordExecutionEvent("unresolved-write", "unknown", { reason: "crash after launch; external side effect uncertain" });
       await assert.rejects(kernel.prompt("Continue mutating"), /require recovery review/);
       await assert.rejects(kernel.compact(), /require recovery review/);
       assert.equal(provider.requests(), 0);
