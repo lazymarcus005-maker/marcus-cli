@@ -24,7 +24,7 @@ node node_modules/tsx/dist/cli.mjs --test test/git-context.test.ts test/test-evi
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
 ```
 
-Focused verification under Node.js 24.21.0 passes; the full suite currently passes 127 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
+Focused verification under Node.js 24.21.0 passes; the full suite currently passes 129 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
 
 ## Open gate items
 

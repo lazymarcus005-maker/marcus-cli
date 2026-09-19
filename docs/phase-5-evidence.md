@@ -14,7 +14,7 @@ Status: **partial; phase gate not passed**
 
 ## Focused verification
 
-- State-store tests cover ledger/checkpoint persistence including unresolved executions in the durable checkpoint file, task snapshot restore, legacy migrations through schema v5, an injected transactional migration failure with successful retry, checkpoint source verification, single-writer locks, refusal to replay a completed Pi tool-call ID, and recovery pauses for explicitly unknown or cancelled side-effecting executions and already-unknown runs across repeated restarts. Explicit session resume compares the saved Git branch/HEAD baseline and pauses on mismatch or when legacy identity is unavailable. The pinned Node.js 24.21.0 full suite passes 127 tests; typecheck, build, and CLI smoke checks pass.
+- State-store and execution tests cover several recovery boundaries: pre-launch and during-authorization cancellation do not authorize, journal, or spawn; post-launch journal failure kills and observes the process group; a completed side effect whose result persistence fails becomes `unknown`; duplicate completed tool-call IDs are refused; and injected migration failure rolls back and can be retried. Additional tests cover ledger/checkpoint recovery, branch/HEAD mismatch, unknown/cancelled-effect gates across restart, checkpoint reconciliation, and single-writer locks. This is partial evidence for issue #19, not the complete interruption matrix; process-crash gaps remain listed below. The pinned Node.js 24.21.0 full suite passes 129 tests; typecheck, build, and CLI smoke checks pass.
 - Pi loopback tests cover manual compaction, one-dispatch request-budget rejection, overlapping prompt/compaction rejection, run cancellation, and persisted-session resume.
 - Focused state, graph, Pi runtime tests and typecheck passed during implementation.
 
@@ -24,3 +24,4 @@ Status: **partial; phase gate not passed**
 - Pi compaction internals own message cut-point/group preservation; Macus has not independently fault-injected malformed/pending tool exchanges across compaction.
 - No measured prompt-cache optimization is implemented; automatic compaction remains intentionally disabled. Cancellation has loopback coverage; additional failure-mode and compaction-boundary fault injection remains open.
 - Cross-store crash reconciliation, cancellation during an active compaction request, and compaction crash-point tests remain open.
+- Issue #19 still lacks a full process-restart matrix for durable execution completion before Pi transcript completion and explicit unknown commit/push/external-side-effect inspection. Existing journal tests validate refusal/gating but do not substitute for those crash/restart scenarios.

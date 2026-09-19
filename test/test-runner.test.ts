@@ -81,6 +81,7 @@ describe("bounded test execution and durable evidence", () => {
         maxLogBytes: 4096,
         environmentAllowlist: ["PATH"],
       };
+      const longerBuildTimeoutExecution = { ...execution, testBuildTimeoutMs: 1000 };
       const filtered = await runTestCommand({
         root,
         sessionId: "configured-runner",
@@ -88,7 +89,7 @@ describe("bounded test execution and durable evidence", () => {
         format: "unknown",
         stateStore: store,
         authorize: async () => true,
-        execution,
+        execution: longerBuildTimeoutExecution,
         protectedCredentialEnvironmentNames: ["MACUS_CONFIG_TEST_SECRET"],
       });
       assert.equal(filtered.result.stdout, "missing");

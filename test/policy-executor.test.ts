@@ -54,6 +54,71 @@ describe("policy-controlled command execution", () => {
     );
   });
 
+  it("does not authorize, journal, or launch a command when cancelled before launch", async () => {
+    const cwd = await fixtureDirectory();
+    const controller = new AbortController();
+    controller.abort();
+    let authorized = false;
+    let prepared = false;
+    let recorded = false;
+    const executor = new PolicyExecutor({
+      authorize: async () => { authorized = true; return true; },
+      journal: {
+        prepareExecution: () => { prepared = true; },
+        recordExecutionEvent: () => { recorded = true; },
+      },
+    });
+    await assert.rejects(executor.execute({
+      command: `${process.execPath} -e "require('fs').writeFileSync('launched', 'yes')"`,
+      cwd,
+      timeoutMs: 1000,
+      allowedEnvironment: ["PATH"],
+      signal: controller.signal,
+      identity: { executionId: "cancel-before-launch", sessionId: "session", effectClass: "workspace-write" },
+    }), /cancelled before authorization/);
+    assert.equal(authorized, false);
+    assert.equal(prepared, false);
+    assert.equal(recorded, false);
+    await assert.rejects(readFile(join(cwd, "launched")), { code: "ENOENT" });
+  });
+
+  it("does not launch when cancellation arrives while authorization is pending", async () => {
+    const cwd = await fixtureDirectory();
+    const controller = new AbortController();
+    let markAuthorizationStarted!: () => void;
+    const authorizationStarted = new Promise<void>((resolve) => { markAuthorizationStarted = resolve; });
+    let finishAuthorization!: () => void;
+    const authorizationGate = new Promise<void>((resolve) => { finishAuthorization = resolve; });
+    let prepared = false;
+    let recorded = false;
+    const executor = new PolicyExecutor({
+      authorize: async () => {
+        markAuthorizationStarted();
+        await authorizationGate;
+        return true;
+      },
+      journal: {
+        prepareExecution: () => { prepared = true; },
+        recordExecutionEvent: () => { recorded = true; },
+      },
+    });
+    const execution = executor.execute({
+      command: `${process.execPath} -e "require('fs').writeFileSync('launched-after-cancel', 'yes')"`,
+      cwd,
+      timeoutMs: 1000,
+      allowedEnvironment: ["PATH"],
+      signal: controller.signal,
+      identity: { executionId: "cancel-during-authorization", sessionId: "session", effectClass: "workspace-write" },
+    });
+    await authorizationStarted;
+    controller.abort();
+    finishAuthorization();
+    await assert.rejects(execution, /cancelled before launch/);
+    assert.equal(prepared, false);
+    assert.equal(recorded, false);
+    await assert.rejects(readFile(join(cwd, "launched-after-cancel")), { code: "ENOENT" });
+  });
+
   it("passes trusted credentials only after exact per-command authorization", async () => {
     const cwd = await fixtureDirectory();
     const prior = process.env.MACUS_EXPLICIT_TEST_KEY;
