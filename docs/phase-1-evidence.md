@@ -13,8 +13,8 @@ Status: **in progress; gate not passed**
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Current automated suite | `npm test` | 152 passed, 0 failed (2026-09-19); deterministic local providers only |
-| Pi protocol and recovery checks | `npx tsx --test test/pi-runtime.test.ts` | 21 passed, 0 failed; nested tool-call and tool-result IDs form a correctly ordered protocol group; streaming, cancellation, compaction, dispose/replacement, resume, and the durable-completion/missing-transcript-result crash boundary run against the deterministic local provider |
+| Current automated suite | `npm test` | 153 passed, 0 failed (2026-09-19); deterministic local providers only |
+| Pi protocol and recovery checks | `npx tsx --test test/pi-runtime.test.ts` | 22 passed, 0 failed; nested tool-call and tool-result IDs form a correctly ordered protocol group; streaming, cancellation, compaction, dispose/replacement, resume, durable-completion/missing-transcript-result recovery, and inactive-branch reconciliation run against the deterministic local provider |
 | Stale-edit preservation | `npx tsx --test test/safe-edit.test.ts` | 2 passed; an external edit is byte-for-byte retained when a stale replacement is rejected (2026-09-19) |
 | Typecheck/build/package | `npm run typecheck`, `npm run build`, `npm pack --dry-run`, install the tarball in a clean prefix, then run packaged `macus --help` and `--version` with Node.js 24.21.0 | Passed on macOS arm64 (2026-09-19; tarball contains runtime artifacts, not compiled tests; version `0.1.0`) |
 | Help/version smoke test | `node dist/src/cli.js --help` and `--version` under Node 24.21.0 | Passed (2026-09-19; version `0.1.0`) |

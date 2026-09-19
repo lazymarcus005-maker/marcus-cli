@@ -68,7 +68,7 @@ export function assertPiSessionCapabilities(session: AgentSession): void {
     }
   }
   const sessionManager = session.sessionManager as unknown as Record<string, unknown>;
-  for (const method of ["getLeafId", "getEntry", "getEntries"] as const) {
+  for (const method of ["getLeafId", "getEntry", "getBranch"] as const) {
     if (typeof sessionManager?.[method] !== "function") {
       throw new Error(`Incompatible Pi SDK: required public session manager capability "${method}" is unavailable; expected @earendil-works/pi-coding-agent@0.85.1`);
     }
@@ -179,7 +179,7 @@ export class PiAgentKernel {
   get transcriptToolResultCallIds(): string[] {
     if (!this.session) return [];
     const callIds = new Set<string>();
-    for (const entry of this.session.sessionManager.getEntries()) {
+    for (const entry of this.session.sessionManager.getBranch()) {
       if (entry.type === "message" && entry.message.role === "toolResult") callIds.add(entry.message.toolCallId);
     }
     return [...callIds];

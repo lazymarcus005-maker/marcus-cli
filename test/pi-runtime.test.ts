@@ -490,6 +490,47 @@ describe("Pi adapter with a deterministic local provider", () => {
     }
   });
 
+  it("does not reconcile a tool result that exists only on an inactive Pi branch", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-pi-inactive-tool-result-"));
+    roots.push(root);
+    const provider = await localProvider([
+      functionToolCompletion("search_code", { query: "INACTIVE_BRANCH_MARKER", limit: 10 }),
+      completion("Search complete."),
+    ]);
+    const store = openStateStore(join(root, ".macus", "state", "state.db"));
+    const kernel = new PiAgentKernel(root, selection(provider.baseUrl, { contextWindow: 16_384, reservedOutputTokens: 256, safetyMarginTokens: 256 }), undefined, store);
+    try {
+      await kernel.start();
+      store.createSession({ sessionId: kernel.sessionId!, worktreeRoot: root, gitDirectory: null });
+      await kernel.prompt("Search for the marker.");
+
+      type TranscriptEntry = {
+        id: string;
+        type: string;
+        message?: { role: string; toolCallId?: string; content?: Array<{ type?: string; id?: string }> };
+      };
+      const sessionManager = (kernel as unknown as { session: { sessionManager: { getEntries(): TranscriptEntry[] } } }).session.sessionManager;
+      const entries = sessionManager.getEntries();
+      const toolResult = entries.find((entry) => entry.type === "message" && entry.message?.role === "toolResult");
+      assert.ok(toolResult?.message?.toolCallId);
+      const toolCall = entries.find((entry) => entry.type === "message"
+        && entry.message?.role === "assistant"
+        && entry.message.content?.some((part) => part.type === "toolCall" && part.id === toolResult.message!.toolCallId));
+      assert.ok(toolCall);
+
+      await kernel.restoreTranscriptEntry(toolCall.id);
+      assert.ok(entries.some((entry) => entry.id === toolResult.id), "the result should remain in the stored session tree");
+      assert.deepEqual(kernel.transcriptToolResultCallIds, [], "inactive-branch results are not active transcript evidence");
+      assert.equal(store.markCompletedExecutionsMissingTranscriptResults(kernel.sessionId!, new Set(kernel.transcriptToolResultCallIds)), 1);
+      assert.deepEqual(store.listUnresolvedExecutions(kernel.sessionId!).map(({ status }) => status), ["unknown"]);
+      await assert.rejects(kernel.prompt("Continue after branching away from the tool result."), /recovery review/);
+      assert.equal(provider.requests(), 2);
+    } finally {
+      await kernel.dispose();
+      store.close();
+    }
+  });
+
   it("pauses after a durable tool completion whose Pi transcript result was not persisted", async () => {
     const root = await mkdtemp(join(tmpdir(), "macus-pi-missing-tool-result-"));
     roots.push(root);
