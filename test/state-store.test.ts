@@ -120,6 +120,36 @@ describe("durable session state", () => {
     store.close();
   });
 
+  it("marks completed executions unknown when their Pi transcript tool result is absent", async () => {
+    const root = await temporaryDirectory();
+    const databasePath = join(root, "state.db");
+    let store = openStateStore(databasePath);
+    store.createSession({ sessionId: "missing-tool-result", worktreeRoot: root, gitDirectory: null });
+    for (const [executionId, toolCallId] of [
+      ["execution-missing-result", "call-missing-result"],
+      ["execution-with-result", "call-with-result"],
+    ]) {
+      store.prepareExecution({ executionId: executionId!, sessionId: "missing-tool-result", toolCallId: toolCallId!, redactedInput: { operation: "write_file", path: "src/value.ts" }, effectClass: "workspace-write" });
+      store.recordExecutionEvent(executionId!, "started", {});
+      store.recordExecutionEvent(executionId!, "completed", {});
+    }
+    store.close();
+
+    store = openStateStore(databasePath);
+    assert.equal(store.markCompletedExecutionsMissingTranscriptResults("missing-tool-result", new Set(["call-with-result"])), 1);
+    assert.equal(store.getExecutionStatus("execution-missing-result"), "unknown");
+    assert.equal(store.getExecutionStatus("execution-with-result"), "completed");
+    assert.deepEqual(store.listUnresolvedExecutions("missing-tool-result"), [
+      { executionId: "execution-missing-result", status: "unknown" },
+    ]);
+    assert.equal(store.markCompletedExecutionsMissingTranscriptResults("missing-tool-result", new Set(["call-with-result"])), 0);
+    assert.throws(
+      () => store.prepareExecution({ executionId: "replayed-execution", sessionId: "missing-tool-result", toolCallId: "call-missing-result", redactedInput: { operation: "write_file" }, effectClass: "workspace-write" }),
+      /automatic replay is refused/,
+    );
+    store.close();
+  });
+
   it("exposes only redacted command summaries for unresolved recovery inspection", async () => {
     const root = await temporaryDirectory();
     const store = openStateStore(join(root, "state.db"));

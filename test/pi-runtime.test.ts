@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -482,8 +482,74 @@ describe("Pi adapter with a deterministic local provider", () => {
       assert.equal(provider.requests(), 2);
       assert.match(provider.bodies()[1] ?? "", /SEARCH_MARKER_9/);
       assert.deepEqual(store.listUnresolvedExecutions(kernel.sessionId!), []);
+      assert.equal(kernel.transcriptToolResultCallIds.length, 1);
+      assert.equal(store.markCompletedExecutionsMissingTranscriptResults(kernel.sessionId!, new Set(kernel.transcriptToolResultCallIds)), 0);
     } finally {
       await kernel.dispose();
+      store.close();
+    }
+  });
+
+  it("pauses after a durable tool completion whose Pi transcript result was not persisted", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-pi-missing-tool-result-"));
+    roots.push(root);
+    const databasePath = join(root, ".macus", "state", "state.db");
+    const sideEffectPath = join(root, "side-effect.txt");
+    const sessionIdPath = join(root, "crashed-session-id.txt");
+    const sideEffectCommand = `${JSON.stringify(process.execPath)} -e 'require("node:fs").writeFileSync(${JSON.stringify(sideEffectPath)}, "completed")'`;
+    const provider = await localProvider([toolCallCompletion(sideEffectCommand), completion("This response must not be reached.")]);
+    const selected = selection(provider.baseUrl, { contextWindow: 16_384, reservedOutputTokens: 256, safetyMarginTokens: 256 });
+    const kernelUrl = new URL("../src/kernel/pi-agent-kernel.ts", import.meta.url).href;
+    const storeUrl = new URL("../src/state/state-store.ts", import.meta.url).href;
+    const childScript = `
+      import { writeFileSync } from "node:fs";
+      import { PiAgentKernel } from ${JSON.stringify(kernelUrl)};
+      import { openStateStore } from ${JSON.stringify(storeUrl)};
+      const store = openStateStore(${JSON.stringify(databasePath)});
+      const recordExecutionEvent = store.recordExecutionEvent.bind(store);
+      store.recordExecutionEvent = (id, status, payload) => {
+        recordExecutionEvent(id, status, payload);
+        if (status === "completed") process.exit(73);
+      };
+      const kernel = new PiAgentKernel(${JSON.stringify(root)}, ${JSON.stringify(selected)}, undefined, store, async () => true);
+      await kernel.start();
+      writeFileSync(${JSON.stringify(sessionIdPath)}, kernel.sessionId);
+      store.createSession({ sessionId: kernel.sessionId, worktreeRoot: ${JSON.stringify(root)}, gitDirectory: null });
+      await kernel.prompt("Run the authorized workspace operation.");
+      process.exit(74);
+    `;
+    const child = spawn(process.execPath, ["--import", "tsx", "--input-type=module", "-e", childScript], {
+      cwd: process.cwd(),
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => { stderr += chunk; });
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(new Error(`Crash-boundary child timed out. stderr: ${stderr}`));
+      }, 15_000);
+      child.once("error", (error) => { clearTimeout(timeout); reject(error); });
+      child.once("close", (code) => { clearTimeout(timeout); resolve(code ?? -1); });
+    });
+    assert.equal(exitCode, 73, stderr);
+    assert.equal(await readFile(sideEffectPath, "utf8"), "completed");
+
+    const sessionId = await readFile(sessionIdPath, "utf8");
+    const store = openStateStore(databasePath);
+    const resumedKernel = new PiAgentKernel(root, selected, undefined, store);
+    try {
+      await resumedKernel.start({ sessionId });
+      assert.deepEqual(resumedKernel.transcriptToolResultCallIds, []);
+      assert.equal(store.markInterruptedRunsUnknown(sessionId).length, 1);
+      assert.equal(store.markInterruptedExecutionsUnknown(sessionId), 0);
+      assert.equal(store.markCompletedExecutionsMissingTranscriptResults(sessionId, new Set(resumedKernel.transcriptToolResultCallIds)), 1);
+      assert.deepEqual(store.listUnresolvedExecutions(sessionId).map(({ status }) => status), ["unknown"]);
+      await assert.rejects(resumedKernel.prompt("Replay the previous operation."), /unknown prior run/);
+      assert.equal(provider.requests(), 1);
+    } finally {
+      await resumedKernel.dispose();
       store.close();
     }
   });

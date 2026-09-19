@@ -171,6 +171,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
     }
     stateStore.markInterruptedRunsUnknown(kernel.sessionId);
     stateStore.markInterruptedExecutionsUnknown(kernel.sessionId);
+    stateStore.markCompletedExecutionsMissingTranscriptResults(kernel.sessionId, new Set(kernel.transcriptToolResultCallIds));
     const unknownRuns = stateStore.listRuns(kernel.sessionId).filter((run) => run.status === "unknown");
     const unresolved = stateStore.listUnresolvedExecutionDetails(kernel.sessionId);
     recoveryBlocked = unresolved.length > 0 || unknownRuns.length > 0 || repositoryIdentityIssue !== undefined;

@@ -678,20 +678,57 @@ export class StateStore {
     return this.withinImmediateTransaction(() => {
       const now = new Date().toISOString();
       const executions = this.database.prepare(
-        "SELECT execution_id AS executionId FROM executions WHERE session_id = ? AND status IN ('prepared', 'started') ORDER BY created_at",
-      ).all(sessionId) as Array<{ executionId: string }>;
-      const insertEvent = this.database.prepare(
-        "INSERT INTO execution_events(execution_id, event_id, status, payload_json, created_at) VALUES (?, ?, 'unknown', ?, ?)",
-      );
-      const updateExecution = this.database.prepare(
-        "UPDATE executions SET status = 'unknown', updated_at = ? WHERE execution_id = ? AND status IN ('prepared', 'started')",
-      );
-      for (const { executionId } of executions) {
-        insertEvent.run(executionId, randomUUID(), JSON.stringify({ reason: "agent process restarted before execution outcome was recorded" }), now);
-        updateExecution.run(now, executionId);
+        "SELECT execution_id AS executionId, status FROM executions WHERE session_id = ? AND status IN ('prepared', 'started') ORDER BY created_at",
+      ).all(sessionId) as Array<{ executionId: string; status: "prepared" | "started" }>;
+      for (const execution of executions) {
+        this.markExecutionUnknownWithinTransaction({
+          executionId: execution.executionId,
+          expectedStatus: execution.status,
+          reason: "agent process restarted before execution outcome was recorded",
+          now,
+        });
+        this.appendLedgerWithinTransaction(sessionId, { kind: "execution-interrupted", executionId: execution.executionId, previousStatus: execution.status }, now);
       }
       return executions.length;
     });
+  }
+
+  /** Fail closed when durable completion has no matching Pi transcript result. */
+  markCompletedExecutionsMissingTranscriptResults(sessionId: string, transcriptToolResultCallIds: ReadonlySet<string>): number {
+    return this.withinImmediateTransaction(() => {
+      const now = new Date().toISOString();
+      const completedExecutions = this.database.prepare(
+        `SELECT execution_id AS executionId, tool_call_id AS toolCallId
+         FROM executions WHERE session_id = ? AND status = 'completed' AND tool_call_id IS NOT NULL
+         ORDER BY created_at, execution_id`,
+      ).all(sessionId) as Array<{ executionId: string; toolCallId: string }>;
+      const missingResults = completedExecutions.filter(({ toolCallId }) => !transcriptToolResultCallIds.has(toolCallId));
+      for (const { executionId, toolCallId } of missingResults) {
+        this.markExecutionUnknownWithinTransaction({
+          executionId,
+          expectedStatus: "completed",
+          reason: "durable tool execution completed but its Pi transcript tool result is missing; automatic replay is unsafe",
+          now,
+        });
+        this.appendLedgerWithinTransaction(sessionId, { kind: "tool-result-missing", executionId, toolCallId, previousStatus: "completed" }, now);
+      }
+      return missingResults.length;
+    });
+  }
+
+  private markExecutionUnknownWithinTransaction(input: {
+    executionId: string;
+    expectedStatus: "prepared" | "started" | "completed";
+    reason: string;
+    now: string;
+  }): void {
+    const update = this.database.prepare(
+      "UPDATE executions SET status = 'unknown', updated_at = ? WHERE execution_id = ? AND status = ?",
+    ).run(input.now, input.executionId, input.expectedStatus);
+    if (Number(update.changes) !== 1) throw new Error(`Execution ${input.executionId} changed before recovery reconciliation`);
+    this.database.prepare(
+      "INSERT INTO execution_events(execution_id, event_id, status, payload_json, created_at) VALUES (?, ?, 'unknown', ?, ?)",
+    ).run(input.executionId, randomUUID(), JSON.stringify({ reason: input.reason }), input.now);
   }
 
   listUnresolvedExecutions(sessionId: string): Array<{ executionId: string; status: string }> {
