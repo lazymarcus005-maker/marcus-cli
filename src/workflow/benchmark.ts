@@ -66,6 +66,12 @@ export interface BenchmarkRawRun extends BenchmarkScenario, BenchmarkCondition {
   observation: BenchmarkObservation;
 }
 
+export interface BenchmarkMetricDistribution {
+  count: number;
+  median: number | null;
+  p95: number | null;
+}
+
 export interface BenchmarkReport {
   schemaVersion: 1;
   benchmarkId: string;
@@ -80,7 +86,7 @@ export interface BenchmarkReport {
     status: "regression" | "no-regression-observed" | "inconclusive";
   };
   rawRuns: BenchmarkRawRun[];
-  metricDistributions: Record<string, Record<string, Record<string, { count: number; median: number | null; p95: number | null }>>>;
+  metricDistributions: Record<BenchmarkSystem, Record<string, Record<string, Record<string, BenchmarkMetricDistribution>>>>;
   claims: string[];
 }
 
@@ -103,7 +109,7 @@ function validateObservation(observation: BenchmarkObservation): void {
   if (observation.recoveryPassed !== null && typeof observation.recoveryPassed !== "boolean") throw new Error("Benchmark recovery status must be boolean or unknown");
 }
 
-function distribution(values: number[]): { count: number; median: number | null; p95: number | null } {
+function distribution(values: number[]): BenchmarkMetricDistribution {
   if (!values.length) return { count: 0, median: null, p95: null };
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
@@ -194,17 +200,20 @@ export async function runPairedBenchmark(input: BenchmarkHarnessInput): Promise<
     if (baseline.observation.recoveryPassed && macus.observation.recoveryPassed === false) regressions.push(`${baseline.taskId}/${baseline.repositoryCache}/${baseline.providerCache}/rep-${baseline.repetition}: recovery regression`);
   }
   const metricNames = ["inputTokens", "outputTokens", "cachedInputTokens", "uncachedInputTokens", "wallTimeMs", "firstUsefulEditMs", "toolCalls", "peakContextTokens", "cliPeakRssBytes"] as const;
-  const metricDistributions: BenchmarkReport["metricDistributions"] = {};
+  const metricDistributions: BenchmarkReport["metricDistributions"] = { unmodified_pi: {}, macus: {} };
   for (const system of ["unmodified_pi", "macus"] as const) {
     metricDistributions[system] = {};
-    for (const condition of stableConditions) {
-      const conditionKey = benchmarkConditionKey(condition);
-      metricDistributions[system]![conditionKey] = {};
-      for (const metric of metricNames) {
-        metricDistributions[system]![conditionKey]![metric] = distribution(rawRuns
-          .filter((run) => run.system === system && run.repositoryCache === condition.repositoryCache && run.providerCache === condition.providerCache)
-          .map((run) => run.observation[metric])
-          .filter((value): value is number => value !== null));
+    for (const scenario of stableScenarios) {
+      metricDistributions[system]![scenario.taskId] = {};
+      for (const condition of stableConditions) {
+        const conditionKey = benchmarkConditionKey(condition);
+        metricDistributions[system]![scenario.taskId]![conditionKey] = {};
+        for (const metric of metricNames) {
+          metricDistributions[system]![scenario.taskId]![conditionKey]![metric] = distribution(rawRuns
+            .filter((run) => run.system === system && run.taskId === scenario.taskId && run.repositoryCache === condition.repositoryCache && run.providerCache === condition.providerCache)
+            .map((run) => run.observation[metric])
+            .filter((value): value is number => value !== null));
+        }
       }
     }
   }

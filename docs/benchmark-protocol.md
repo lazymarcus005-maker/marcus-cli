@@ -19,9 +19,10 @@ are retained as unknown observations, never treated as passes; exception text
 is omitted from reports to avoid persisting secrets. The plan is capped at
 2,000 executions.
 
-Metric distributions are kept separate by repository-cache and provider-cache
-condition; either cache state may be explicitly `unknown`, and duplicate
-condition labels are rejected instead of silently pooling distinct runs.
+Metric distributions are kept separate by task, system, repository-cache, and
+provider-cache condition; either cache state may be explicitly `unknown`, and
+duplicate condition labels are rejected instead of silently pooling distinct
+runs. Raw observations remain available for every individual run.
 
 Both adapters apply the scenario's validated OpenAI-compatible generation
 settings at Pi's pre-provider-request hook. Supported controls are temperature,
@@ -31,7 +32,7 @@ invalid values fail before a request is sent.
 
 Correctness and recovery regressions are reported before metrics. Token, cache,
 latency, first-edit, tool-call, peak-context, and CLI-RSS distributions are
-reported separately; missing metrics remain absent. A report explicitly makes
+reported per task and condition; missing metrics remain absent. A report explicitly makes
 no performance or equivalence claim. Cache metrics require adapter-supplied
 measurements and units/denominators before interpretation.
 

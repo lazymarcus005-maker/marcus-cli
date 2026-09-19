@@ -44,7 +44,7 @@ describe("paired benchmark harness", () => {
     assert.equal(report.correctnessFirst.status, "no-regression-observed");
     assert.ok(Object.keys(report).indexOf("correctnessFirst") < Object.keys(report).indexOf("rawRuns"));
     assert.ok(Object.keys(report).indexOf("correctnessFirst") < Object.keys(report).indexOf("metricDistributions"));
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.median, 1000);
+    assert.equal(report.metricDistributions.macus?.["bounded-search"]?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.median, 1000);
     assert.equal(report.rawRuns[0]?.promptSha256, report.rawRuns[1]?.promptSha256);
     assert.equal(report.rawRuns[0]?.repositoryCache, "cold");
     assert.equal(report.rawRuns[0]?.providerCache, "unknown");
@@ -68,11 +68,29 @@ describe("paired benchmark harness", () => {
             : current.repositoryCache === "warm" ? 300 : 400),
     });
 
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=cold"]?.wallTimeMs?.median, 100);
-    assert.equal(report.metricDistributions.unmodified_pi?.["repositoryCache=cold;providerCache=warm"]?.wallTimeMs?.median, 200);
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=warm;providerCache=unknown"]?.wallTimeMs?.median, 300);
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=unknown;providerCache=unknown"]?.wallTimeMs?.median, 400);
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=cold"]?.wallTimeMs?.count, 3);
+    assert.equal(report.metricDistributions.macus?.["bounded-search"]?.["repositoryCache=cold;providerCache=cold"]?.wallTimeMs?.median, 100);
+    assert.equal(report.metricDistributions.unmodified_pi?.["bounded-search"]?.["repositoryCache=cold;providerCache=warm"]?.wallTimeMs?.median, 200);
+    assert.equal(report.metricDistributions.macus?.["bounded-search"]?.["repositoryCache=warm;providerCache=unknown"]?.wallTimeMs?.median, 300);
+    assert.equal(report.metricDistributions.macus?.["bounded-search"]?.["repositoryCache=unknown;providerCache=unknown"]?.wallTimeMs?.median, 400);
+    assert.equal(report.metricDistributions.macus?.["bounded-search"]?.["repositoryCache=cold;providerCache=cold"]?.wallTimeMs?.count, 3);
+  });
+
+  it("keeps distributions separate by task as well as system and cache condition", async () => {
+    const slowScenario: BenchmarkScenario = { ...scenario, taskId: "large-output" };
+    const report = await runPairedBenchmark({
+      scenarios: [scenario, slowScenario],
+      conditions: [condition],
+      repetitions: 3,
+      prepareWorkspace: async () => undefined,
+      run: async ({ scenario: current, system }) => observation("passed", true,
+        current.taskId === "bounded-search" ? (system === "macus" ? 100 : 110) : (system === "macus" ? 900 : 910)),
+    });
+
+    const conditionKey = "repositoryCache=cold;providerCache=unknown";
+    assert.equal(report.metricDistributions.macus?.["bounded-search"]?.[conditionKey]?.wallTimeMs?.median, 100);
+    assert.equal(report.metricDistributions.macus?.["large-output"]?.[conditionKey]?.wallTimeMs?.median, 900);
+    assert.equal(report.metricDistributions.unmodified_pi?.["bounded-search"]?.[conditionKey]?.wallTimeMs?.median, 110);
+    assert.equal(report.metricDistributions.unmodified_pi?.["large-output"]?.[conditionKey]?.wallTimeMs?.median, 910);
   });
 
   it("surfaces correctness/recovery regressions before performance and marks unknown comparisons inconclusive", async () => {
