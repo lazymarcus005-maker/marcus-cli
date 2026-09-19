@@ -20,6 +20,7 @@ describe("macus CLI", () => {
     assert.equal(result, 0);
     assert.match(output.join(""), /Macus Code/);
     assert.match(output.join(""), /macus \[task\]/);
+    assert.match(output.join(""), /\/recovery/);
   });
 
   it("shows the package version without starting an agent session", async () => {

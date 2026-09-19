@@ -22,6 +22,7 @@ import { runTestCommand } from "./workflow/test-runner.js";
 import { buildCompactionInstructions, createDurableCheckpoint, reconcileDurableCheckpoints, verifyCheckpointSources } from "./workflow/checkpoints.js";
 import { inspectGit, type GitInspectionOperation } from "./workflow/git-inspection.js";
 import { formatReviewReport } from "./workflow/review-report.js";
+import { formatRecoveryReport } from "./workflow/recovery-report.js";
 import { checkRepositoryResumeIdentity } from "./workflow/repository-identity.js";
 import type { ExecutionAuthorization } from "./execution/policy-executor.js";
 
@@ -42,6 +43,7 @@ Options:
 Session commands:
   /help           Show this help
   /status         Show selected model and request limits
+  /recovery       Inspect redacted details for unresolved executions and runs
   /models         List trusted model aliases
   /model [ALIAS]  Show or switch the current session's trusted model
   /settings       Show validated, non-secret effective model settings
@@ -143,11 +145,12 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
   };
   const newKernel = (): PiAgentKernel => new PiAgentKernel(cwd, selection, undefined, stateStore, authorizeCommand);
   let recoveryBlocked = false;
+  let repositoryIdentityIssue: string | undefined;
 
   const registerSessionIdentity = async (verifyRepositoryIdentity = false): Promise<void> => {
     if (!kernel?.sessionId) throw new Error("Pi did not create a session identity");
     const existing = stateStore.getSession(kernel.sessionId);
-    let repositoryIdentityIssue: string | undefined;
+    repositoryIdentityIssue = undefined;
     if (existing) {
       if (existing.worktreeRoot !== cwd || existing.gitDirectory !== gitDirectory) {
         throw new Error("Saved Macus session belongs to a different worktree or Git directory");
@@ -168,15 +171,9 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
     }
     stateStore.markInterruptedRunsUnknown(kernel.sessionId);
     const unknownRuns = stateStore.listRuns(kernel.sessionId).filter((run) => run.status === "unknown");
-    if (unknownRuns.length) {
-      console.error(`Session resume paused: ${unknownRuns.length} run(s) have unknown outcomes (${unknownRuns.map((run) => run.runId).join(", ")}). No run was replayed; use /clear after reviewing state.`);
-    }
-    const unresolved = stateStore.listUnresolvedExecutions(kernel.sessionId);
+    const unresolved = stateStore.listUnresolvedExecutionDetails(kernel.sessionId);
     recoveryBlocked = unresolved.length > 0 || unknownRuns.length > 0 || repositoryIdentityIssue !== undefined;
-    if (repositoryIdentityIssue) console.error(`Session resume paused: ${repositoryIdentityIssue}. No mutation or replay is allowed.`);
-    if (recoveryBlocked) {
-      console.error(`Session resume paused: ${unresolved.length} execution(s) have unknown outcomes (${unresolved.map((item) => `${item.executionId}:${item.status}`).join(", ")}). No command will be replayed. Use /clear for a new session after reviewing side effects.`);
-    }
+    if (recoveryBlocked) console.error(formatRecoveryReport({ executions: unresolved, unknownRunIds: unknownRuns.map((run) => run.runId), ...(repositoryIdentityIssue ? { repositoryIdentityIssue } : {}) }));
     const checkpoints = await reconcileDurableCheckpoints({ root: cwd, sessionId: kernel.sessionId, stateStore });
     if (checkpoints.removedTemporaryFiles.length || checkpoints.removedOrphanFiles.length || checkpoints.missingRegisteredFiles.length || checkpoints.invalidFiles.length) {
       console.error(`Checkpoint reconciliation: removed ${checkpoints.removedTemporaryFiles.length} temp and ${checkpoints.removedOrphanFiles.length} orphan file(s); ${checkpoints.missingRegisteredFiles.length} registered file(s) missing; ${checkpoints.invalidFiles.length} invalid file(s). No source files were changed.`);
@@ -214,6 +211,13 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
         stdout.write(`session ${kernel.sessionId ?? "unknown"}${recoveryBlocked ? " (paused for recovery)" : ""}\n`);
         stdout.write(`model ${selection.alias} (${selection.providerId}/${selection.model})\n`);
         stdout.write(`context ${selection.contextWindow}; input cap ${selection.maxInputTokens ?? "not separately capped"}; reserved output ${selection.reservedOutputTokens}; safety margin ${selection.safetyMarginTokens}; prompt cap ${promptLimitForModel(selection)}\n`);
+      } else if (command === "/recovery") {
+        const unknownRuns = stateStore.listRuns(kernel.sessionId!).filter((run) => run.status === "unknown");
+        stdout.write(formatRecoveryReport({
+          executions: stateStore.listUnresolvedExecutionDetails(kernel.sessionId!),
+          unknownRunIds: unknownRuns.map((run) => run.runId),
+          ...(repositoryIdentityIssue ? { repositoryIdentityIssue } : {}),
+        }));
       } else if (command === "/models") {
         const aliases = await listTrustedModelAliases(globalConfigPath);
         stdout.write(`Trusted models${selection.alias ? ` (current: ${selection.alias})` : ""}: ${aliases.join(", ") || "none"}\n`);

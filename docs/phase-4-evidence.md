@@ -12,6 +12,7 @@ Status: **in progress; gate not passed**
 - `/test node-json -- COMMAND`, `/test junit|trx REPORT_PATH -- COMMAND`, and `/test unknown -- COMMAND` run through approval, the execution journal, timeout and output bounds. Parsed counts are persisted with command, timing, exit/signal, cancellation/timeout, output completeness, execution ID and snapshot identity. Node counts must reconcile with outcomes; TRX requires case-sensitive recognized run data and consistent counters. `/review` distinguishes `not_run` from an attempted command missing its evidence record. Unknown runners are recorded with status `unknown`, never passed. Commands are redacted before evidence persistence.
 - Trusted global execution/log settings now reach the shell and test runners: command/test timeouts, termination grace, in-memory and spool caps, environment allowlist, retention, and aggregate log limits are applied. Every trusted provider API-key environment variable is stripped even if listed in the allowlist. Project attempts to add execution/log settings remain rejected.
 - `/review` reports Changed, Tested, Remaining Risk, and Unresolved Issue from current Git context and durable test/run/task/execution records; missing test-command evidence is identified as `not_run`. It explicitly warns that the bounded report is not semantic code review.
+- `/recovery` displays bounded redacted execution/tool intent and effect classes for unresolved executions, unknown run IDs, and repository identity blockers; it never exposes raw journal payloads or resolves/replays an effect.
 - Empty, malformed, partial, timed-out, cancelled, stale-snapshot, unparseable and non-Git snapshot cases cannot produce a passing evidence status. TRX results additionally require a recognized completed/failed run outcome and internally consistent outcome counters; error/timeout counters count as failures, while incomplete or contradictory summaries remain unknown. JUnit/TRX sidecar reports must also have a changed file identity during the run; an unchanged valid report (including one with a future timestamp) remains unknown.
 - Prompts and compaction are refused at the kernel boundary while an execution outcome is unresolved.
 - The executor rechecks cancellation after asynchronous log allocation and immediately before spawn. A cancellation in that boundary records a confirmed prelaunch failure and prevents the side effect; the regression is covered in `test/policy-executor.test.ts`.
@@ -25,7 +26,7 @@ node node_modules/tsx/dist/cli.mjs --test test/git-context.test.ts test/test-evi
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
 ```
 
-Focused verification under Node.js 24.21.0 passes; the full suite currently passes 140 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
+Focused verification under Node.js 24.21.0 passes; the full suite currently passes 144 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
 
 ## Open gate items
 

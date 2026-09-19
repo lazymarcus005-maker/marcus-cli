@@ -120,6 +120,44 @@ describe("durable session state", () => {
     store.close();
   });
 
+  it("exposes only redacted command summaries for unresolved recovery inspection", async () => {
+    const root = await temporaryDirectory();
+    const store = openStateStore(join(root, "state.db"));
+    store.createSession({ sessionId: "recovery-details", worktreeRoot: root, gitDirectory: null });
+    store.prepareExecution({
+      executionId: "unknown-push",
+      sessionId: "recovery-details",
+      redactedInput: { command: "git push origin main --token=[REDACTED]", secret: "must-not-be-returned" },
+      effectClass: "external",
+    });
+    store.recordExecutionEvent("unknown-push", "started", {});
+    store.recordExecutionEvent("unknown-push", "unknown", { providerResponse: "must-not-be-returned" });
+    store.prepareExecution({
+      executionId: "unknown-write",
+      sessionId: "recovery-details",
+      redactedInput: { operation: "write_file", path: "src/app.ts", content: "private source text", contentSha256: "a".repeat(64) },
+      effectClass: "workspace-write",
+    });
+    store.recordExecutionEvent("unknown-write", "started", {});
+    store.recordExecutionEvent("unknown-write", "unknown", { error: "must-not-be-returned" });
+
+    assert.deepEqual(store.listUnresolvedExecutionDetails("recovery-details"), [
+      {
+        executionId: "unknown-push",
+        status: "unknown",
+        effectClass: "external",
+        intentSummary: "git push origin main --token=[REDACTED]",
+      },
+      {
+        executionId: "unknown-write",
+        status: "unknown",
+        effectClass: "workspace-write",
+        intentSummary: 'operation="write_file" path="src/app.ts"',
+      },
+    ]);
+    store.close();
+  });
+
   it("requires review for cancelled executions that may have had side effects", async () => {
     const root = await temporaryDirectory();
     const store = openStateStore(join(root, "state.db"));

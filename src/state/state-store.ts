@@ -74,6 +74,16 @@ export interface DurableRun {
   updatedAt: string;
 }
 
+export interface UnresolvedExecutionDetail {
+  executionId: string;
+  status: string;
+  effectClass: "read" | "workspace-write" | "test-build" | "external" | "destructive";
+  intentSummary: string;
+}
+
+const UNRESOLVED_EXECUTION_PREDICATE = `status IN ('prepared', 'started', 'unknown') OR
+  (status = 'cancelled' AND effect_class IN ('workspace-write', 'test-build', 'external', 'destructive'))`;
+
 interface StateSessionRow {
   session_id: string;
   worktree_root: string;
@@ -659,12 +669,41 @@ export class StateStore {
   listUnresolvedExecutions(sessionId: string): Array<{ executionId: string; status: string }> {
     const rows = this.database.prepare(
       `SELECT execution_id AS executionId, status FROM executions
-       WHERE session_id = ? AND (
-         status IN ('prepared', 'started', 'unknown') OR
-         (status = 'cancelled' AND effect_class IN ('workspace-write', 'test-build', 'external', 'destructive'))
-       ) ORDER BY created_at`,
+       WHERE session_id = ? AND (${UNRESOLVED_EXECUTION_PREDICATE}) ORDER BY created_at`,
     ).all(sessionId) as Array<{ executionId: string; status: string }>;
     return rows.map((row) => ({ executionId: row.executionId, status: row.status }));
+  }
+
+  listUnresolvedExecutionDetails(sessionId: string): UnresolvedExecutionDetail[] {
+    const rows = this.database.prepare(
+      `SELECT execution_id AS executionId, status, effect_class AS effectClass, redacted_input_json AS redactedInput
+       FROM executions WHERE session_id = ? AND (${UNRESOLVED_EXECUTION_PREDICATE}) ORDER BY created_at`,
+    ).all(sessionId) as Array<{ executionId: string; status: string; effectClass: UnresolvedExecutionDetail["effectClass"]; redactedInput: string }>;
+    return rows.map((row) => {
+      let intentSummary = "[operation details unavailable]";
+      try {
+        const redactedInput: unknown = JSON.parse(row.redactedInput);
+        if (typeof redactedInput === "object" && redactedInput !== null) {
+          const record = redactedInput as Record<string, unknown>;
+          if (typeof record.command === "string") {
+            intentSummary = record.command;
+          } else {
+            const safeStringFields = ["operation", "gitOperation", "path", "revision", "logRef", "target", "symbolId"] as const;
+            const summaryFields: string[] = [];
+            for (const key of safeStringFields) {
+              const value = record[key];
+              if (typeof value === "string" && value.length) summaryFields.push(`${key}=${JSON.stringify(value.slice(0, 300))}`);
+            }
+            for (const key of ["startLine", "endLine", "startByte", "maxBytes"] as const) {
+              const value = record[key];
+              if (typeof value === "number" && Number.isSafeInteger(value)) summaryFields.push(`${key}=${value}`);
+            }
+            if (summaryFields.length) intentSummary = summaryFields.join(" ").slice(0, 500);
+          }
+        }
+      } catch { /* Corrupt intent remains visible by ID/status without exposing raw storage. */ }
+      return { executionId: row.executionId, status: row.status, effectClass: row.effectClass, intentSummary };
+    });
   }
 
   close(): void {
