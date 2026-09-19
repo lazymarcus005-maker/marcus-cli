@@ -48,9 +48,10 @@ describe("paired benchmark harness", () => {
     assert.equal(report.rawRuns[0]?.providerCache, "unknown");
   });
 
-  it("keeps metric distributions separate for cold, warm, and unknown repository-cache states", async () => {
+  it("keeps metric distributions separate for repository and provider cache states", async () => {
     const conditions: BenchmarkCondition[] = [
-      { repositoryCache: "cold", providerCache: "unknown" },
+      { repositoryCache: "cold", providerCache: "cold" },
+      { repositoryCache: "cold", providerCache: "warm" },
       { repositoryCache: "warm", providerCache: "unknown" },
       { repositoryCache: "unknown", providerCache: "unknown" },
     ];
@@ -59,13 +60,17 @@ describe("paired benchmark harness", () => {
       conditions,
       repetitions: 3,
       prepareWorkspace: async () => undefined,
-      run: async ({ condition: current }) => observation("passed", true, current.repositoryCache === "cold" ? 100 : current.repositoryCache === "warm" ? 200 : 300),
+      run: async ({ condition: current }) => observation("passed", true,
+        current.repositoryCache === "cold" && current.providerCache === "cold" ? 100
+          : current.repositoryCache === "cold" && current.providerCache === "warm" ? 200
+            : current.repositoryCache === "warm" ? 300 : 400),
     });
 
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.median, 100);
-    assert.equal(report.metricDistributions.unmodified_pi?.["repositoryCache=warm;providerCache=unknown"]?.wallTimeMs?.median, 200);
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=unknown;providerCache=unknown"]?.wallTimeMs?.median, 300);
-    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.count, 3);
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=cold"]?.wallTimeMs?.median, 100);
+    assert.equal(report.metricDistributions.unmodified_pi?.["repositoryCache=cold;providerCache=warm"]?.wallTimeMs?.median, 200);
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=warm;providerCache=unknown"]?.wallTimeMs?.median, 300);
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=unknown;providerCache=unknown"]?.wallTimeMs?.median, 400);
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=cold"]?.wallTimeMs?.count, 3);
   });
 
   it("surfaces correctness/recovery regressions before performance and marks unknown comparisons inconclusive", async () => {
