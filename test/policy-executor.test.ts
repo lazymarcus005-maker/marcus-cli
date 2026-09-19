@@ -361,6 +361,10 @@ describe("policy-controlled command execution", () => {
       import { PolicyExecutor } from ${JSON.stringify(executorUrl)};
       const store = openStateStore(${JSON.stringify(databasePath)});
       store.createSession({ sessionId: "process-crash", worktreeRoot: ${JSON.stringify(cwd)}, gitDirectory: null });
+      store.prepareExecution({
+        executionId: "crash-before-launch", sessionId: "process-crash",
+        redactedInput: { command: "not launched" }, effectClass: "workspace-write",
+      });
       const journal = {
         prepareExecution: (input) => store.prepareExecution(input),
         recordExecutionEvent: (id, status, payload) => {
@@ -387,13 +391,13 @@ describe("policy-controlled command execution", () => {
 
     const store = openStateStore(databasePath);
     try {
+      assert.equal(store.getExecutionStatus("crash-before-launch"), "prepared");
       assert.equal(store.getExecutionStatus("crash-after-write"), "started");
-      assert.equal(store.markInterruptedExecutionsUnknown("process-crash"), 1);
+      assert.equal(store.markInterruptedExecutionsUnknown("process-crash"), 2);
+      assert.equal(store.getExecutionStatus("crash-before-launch"), "unknown");
       assert.equal(store.getExecutionStatus("crash-after-write"), "unknown");
       assert.equal(store.markInterruptedExecutionsUnknown("process-crash"), 0);
-      assert.deepEqual(store.listUnresolvedExecutions("process-crash"), [
-        { executionId: "crash-after-write", status: "unknown" },
-      ]);
+      assert.deepEqual(store.listUnresolvedExecutions("process-crash").map((execution) => execution.status), ["unknown", "unknown"]);
     } finally {
       store.close();
     }
