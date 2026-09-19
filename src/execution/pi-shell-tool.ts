@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { PolicyExecutor } from "./policy-executor.js";
+import { PolicyExecutor, type ExecutionAuthorization } from "./policy-executor.js";
 import { ExecutionLogStore } from "./execution-log-store.js";
+import { defaultExecutionSettings, defaultLogSettings, type ExecutionSettings, type LogSettings } from "./execution-settings.js";
 import type { StateStore } from "../state/state-store.js";
 
 const MODEL_RESULT_LIMIT = 32 * 1024;
@@ -13,9 +14,19 @@ export function createPolicyShellTool(options: {
   stateStore: StateStore;
   sessionId: () => string | undefined;
   runId: () => string | undefined;
-  authorizeCommand: (command: string, signal?: AbortSignal) => Promise<boolean>;
+  authorizeCommand: (command: string, credentialEnvironmentNames: readonly string[], signal?: AbortSignal) => Promise<ExecutionAuthorization>;
+  execution?: ExecutionSettings;
+  logs?: LogSettings;
+  protectedCredentialEnvironmentNames?: readonly string[];
+  credentialEnvironmentNames?: readonly string[];
 }) {
-  const logs = new ExecutionLogStore(options.cwd);
+  const execution = options.execution ?? defaultExecutionSettings();
+  const logSettings = options.logs ?? defaultLogSettings();
+  const logStore = new ExecutionLogStore(options.cwd, {
+    maxExecutionBytes: execution.maxLogBytes,
+    retentionDays: logSettings.retentionDays,
+    maxTotalBytes: logSettings.maxTotalBytes,
+  });
   const bash = defineTool({
     name: "bash",
     label: "bash (policy controlled)",
@@ -24,25 +35,27 @@ export function createPolicyShellTool(options: {
     executionMode: "sequential",
     parameters: Type.Object({
       command: Type.String({ minLength: 1 }),
-      timeoutMs: Type.Optional(Type.Integer({ minimum: 1, maximum: 600_000 })),
+      timeoutMs: Type.Optional(Type.Integer({ minimum: 1, maximum: execution.commandTimeoutMs })),
     }),
     async execute(toolCallId, params, signal, _onUpdate, _ctx) {
-      const approved = await options.authorizeCommand(params.command, signal);
+      const authorization = await options.authorizeCommand(params.command, options.credentialEnvironmentNames ?? [], signal);
       const sessionId = options.sessionId();
       const runId = options.runId();
       if (!sessionId) throw new Error("Cannot execute before the Macus session is durably identified");
       const executor = new PolicyExecutor({
-        authorize: async () => approved,
-        maxOutputBytes: 8 * 1024 * 1024,
+        authorize: async () => authorization,
+        maxOutputBytes: execution.maxOutputMemoryBytes,
+        ...(options.protectedCredentialEnvironmentNames ? { deniedEnvironmentNames: options.protectedCredentialEnvironmentNames } : {}),
+        ...(options.credentialEnvironmentNames ? { authorizableEnvironmentNames: options.credentialEnvironmentNames } : {}),
         journal: options.stateStore,
-        logStore: logs,
+        logStore,
       });
       const result = await executor.execute({
         command: params.command,
         cwd: options.cwd,
-        timeoutMs: params.timeoutMs ?? 120_000,
-        terminationGraceMs: 2_000,
-        allowedEnvironment: ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL"],
+        timeoutMs: params.timeoutMs ?? execution.commandTimeoutMs,
+        terminationGraceMs: execution.terminationGraceMs,
+        allowedEnvironment: execution.environmentAllowlist,
         ...(signal ? { signal } : {}),
         identity: {
           executionId: randomUUID(),
@@ -95,7 +108,7 @@ export function createPolicyShellTool(options: {
       });
       options.stateStore.recordExecutionEvent(readExecutionId, "started", {});
       try {
-        const page = await logs.read(sessionId, params.logRef, params.startByte ?? 0, params.maxBytes ?? 16 * 1024);
+        const page = await logStore.read(sessionId, params.logRef, params.startByte ?? 0, params.maxBytes ?? 16 * 1024);
         options.stateStore.recordExecutionEvent(readExecutionId, "completed", { bytesRead: Buffer.byteLength(page.text, "utf8"), nextByte: page.nextByte, truncated: page.truncated });
         return {
           content: [{ type: "text", text: `${page.text}\n[log page: nextByte=${page.nextByte ?? "end"}; truncated=${page.truncated}]` }],

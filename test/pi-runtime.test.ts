@@ -127,10 +127,21 @@ function selection(baseUrl: string, budgets: Pick<TrustedModelSelection, "contex
     protocol: "openai-compatible",
     baseUrl,
     apiKey: "fixture-key",
+    protectedCredentialEnvironmentNames: [],
+    credentialEnvironmentNames: [],
     profile: "fixture",
     model: "fixture-model",
     maxOutputTokens: budgets.reservedOutputTokens,
     runLimits: { maxModelTurns: 40, maxNoProgressAttempts: 3, maxDurationSeconds: 1800 },
+    execution: {
+      commandTimeoutMs: 120_000,
+      testBuildTimeoutMs: 600_000,
+      terminationGraceMs: 2_000,
+      maxOutputMemoryBytes: 8 * 1024 * 1024,
+      maxLogBytes: 100 * 1024 * 1024,
+      environmentAllowlist: ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL"],
+    },
+    logs: { retentionDays: 7, maxTotalBytes: 1024 * 1024 * 1024 },
     features: { repoMap: true, codeGraph: true, contextLedger: true, checkpoint: true, gitContext: true, taskEngine: true },
     ...budgets,
   };
@@ -370,6 +381,35 @@ describe("Pi adapter with a deterministic local provider", () => {
       assert.ok(executionId);
       assert.equal(store.getExecutionRunId(executionId), run?.runId);
     } finally {
+      await kernel.dispose();
+      store.close();
+    }
+  });
+
+  it("applies the trusted environment allowlist to model-requested shell commands", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-pi-shell-settings-"));
+    roots.push(root);
+    const provider = await localProvider([
+      functionToolCompletion("bash", { command: `node -e 'process.stdout.write(process.env.MACUS_BENCH_TEST_SECRET ?? "missing")'` }),
+      completion("done"),
+    ]);
+    const model = selection(provider.baseUrl, { contextWindow: 16_384, reservedOutputTokens: 256, safetyMarginTokens: 256 });
+    model.credentialEnvironmentNames = ["MACUS_BENCH_TEST_SECRET"];
+    model.execution.environmentAllowlist = ["PATH", "MACUS_BENCH_TEST_SECRET"];
+    const store = openStateStore(join(root, ".macus", "state", "state.db"));
+    const kernel = new PiAgentKernel(root, model, undefined, store, async () => true);
+    const previous = process.env.MACUS_BENCH_TEST_SECRET;
+    process.env.MACUS_BENCH_TEST_SECRET = "must-not-reach-child";
+    try {
+      await kernel.start();
+      store.createSession({ sessionId: kernel.sessionId!, worktreeRoot: root, gitDirectory: null });
+      await kernel.prompt("Run the command and report its output.");
+      assert.equal(provider.requests(), 2);
+      assert.match(provider.bodies()[1] ?? "", /missing/);
+      assert.doesNotMatch(provider.bodies()[1] ?? "", /must-not-reach-child/);
+    } finally {
+      if (previous === undefined) delete process.env.MACUS_BENCH_TEST_SECRET;
+      else process.env.MACUS_BENCH_TEST_SECRET = previous;
       await kernel.dispose();
       store.close();
     }

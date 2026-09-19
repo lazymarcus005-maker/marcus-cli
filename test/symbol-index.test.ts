@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { after, describe, it } from "node:test";
 import { buildSymbolIndex, searchSymbols } from "../src/retrieval/symbol-index.js";
 import { listRepositoryFiles } from "../src/retrieval/symbol-index.js";
@@ -10,6 +11,64 @@ const roots: string[] = [];
 after(async () => Promise.all(roots.map((root) => rm(root, { recursive: true, force: true }))));
 
 describe("syntax-aware symbol index", () => {
+  it("parses versioned TS, JS, and C# syntax fixtures with complete declaration ranges", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-symbol-fixtures-v1-"));
+    roots.push(root);
+    const fixtureDirectory = fileURLToPath(new URL("./fixtures/syntax/v1/", import.meta.url));
+    const fixtures = ["catalog.ts", "widget.js", "Catalog.cs", "base-catalog.ts", "base-widget.js", "base-widget.d.ts"];
+    const requiredSyntax: Record<string, string[]> = {
+      "catalog.ts": ["import {", "export namespace", "export type", "export enum", "export interface", "export class", "constructor(", "find("],
+      "widget.js": ["import {", "export class", "constructor(", "render(", "export function", "export const"],
+      "Catalog.cs": ["using System;", "namespace Fixture.Catalog;", "public enum", "public interface", "record struct", "public sealed class", "public string Name", "public T Find("],
+    };
+    for (const fixture of fixtures) {
+      const languageDirectory = fixture.endsWith(".cs") ? "dotnet" : "src";
+      await mkdir(join(root, languageDirectory), { recursive: true });
+      const source = await readFile(join(fixtureDirectory, fixture), "utf8");
+      for (const syntax of requiredSyntax[fixture] ?? []) assert.ok(source.includes(syntax), `${fixture} fixture must include ${syntax}`);
+      await writeFile(join(root, languageDirectory, fixture), source);
+    }
+
+    const index = await buildSymbolIndex(root);
+    assert.equal(index.coverage.length, fixtures.length);
+    assert.ok(index.coverage.every((entry) => entry.status === "complete"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "Inventory" && symbol.kind === "namespace"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "ItemKey" && symbol.kind === "type"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "CatalogStore" && symbol.kind === "class" && symbol.signature.includes("extends BaseCatalog")));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "CatalogItem" && symbol.kind === "interface"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "key" && symbol.kind === "property" && symbol.path.endsWith("catalog.ts")));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "createStore" && symbol.kind === "function" && symbol.signature.includes("CatalogItem[]")));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "renderWidget" && symbol.kind === "variable"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "CatalogKey" && symbol.kind === "record"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "Name" && symbol.kind === "property"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "Find" && symbol.kind === "method" && symbol.endLine > symbol.startLine));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "BaseCatalog" && symbol.kind === "class"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "BaseWidget" && symbol.kind === "class"));
+    assert.ok(index.symbols.some((symbol) => symbol.name === "createBaseWidget" && symbol.kind === "function"));
+    const fixtureSymbol = (path: string, name: string, kind: string) => index.symbols.find((symbol) => symbol.path.endsWith(path) && symbol.name === name && symbol.kind === kind);
+    for (const [path, name, kind] of [
+      ["catalog.ts", "CatalogStore", "class"],
+      ["catalog.ts", "CatalogItem", "interface"],
+      ["catalog.ts", "key", "property"],
+      ["widget.js", "CatalogWidget", "class"],
+      ["Catalog.cs", "Catalog", "class"],
+      ["Catalog.cs", "CatalogKey", "record"],
+      ["Catalog.cs", "Name", "property"],
+    ]) {
+      const symbol = fixtureSymbol(path!, name!, kind!);
+      assert.ok(symbol, `${path} must index ${kind} ${name}`);
+      assert.ok(symbol.signature.length > 0, `${name} must have a signature`);
+      assert.ok(symbol.startLine > 0 && symbol.endLine >= symbol.startLine, `${name} must have a valid source range`);
+    }
+    assert.ok(fixtureSymbol("catalog.ts", "CatalogStore", "class")!.signature.includes("extends BaseCatalog"));
+    assert.ok(fixtureSymbol("widget.js", "CatalogWidget", "class")!.signature.includes("createBaseWidget"));
+    assert.ok(fixtureSymbol("widget.js", "CatalogWidget", "class")!.endLine > fixtureSymbol("widget.js", "CatalogWidget", "class")!.startLine);
+    assert.ok(fixtureSymbol("Catalog.cs", "Catalog", "class")!.signature.includes("ICatalog<T>"));
+    assert.ok(fixtureSymbol("Catalog.cs", "Find", "method")!.signature.includes("T Find(string key)"));
+    assert.ok(index.symbols.every((symbol) => symbol.signature.length > 0 && symbol.startLine > 0 && symbol.endLine >= symbol.startLine));
+    assert.equal(new Set(index.symbols.map((symbol) => symbol.id)).size, index.symbols.length);
+  });
+
   it("indexes TS/TSX, JavaScript, and C# declarations with disambiguated source identities", async () => {
     const root = await mkdtemp(join(tmpdir(), "macus-symbols-"));
     roots.push(root);

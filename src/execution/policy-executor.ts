@@ -50,9 +50,18 @@ export interface CommandResult {
   logTruncated?: boolean;
 }
 
+export interface ExecutionAuthorizationDecision {
+  approved: boolean;
+  authorizedEnvironmentNames?: readonly string[];
+}
+
+export type ExecutionAuthorization = boolean | ExecutionAuthorizationDecision;
+
 export interface PolicyExecutorOptions {
-  authorize: (request: Readonly<CommandRequest>) => boolean | Promise<boolean>;
+  authorize: (request: Readonly<CommandRequest>) => ExecutionAuthorization | Promise<ExecutionAuthorization>;
   maxOutputBytes?: number;
+  deniedEnvironmentNames?: readonly string[];
+  authorizableEnvironmentNames?: readonly string[];
   journal?: ExecutionJournal;
   logStore?: ExecutionLogStore;
 }
@@ -82,7 +91,14 @@ export class PolicyExecutor {
       throw new Error("timeoutMs must be between 1 and 600000 milliseconds");
     }
     if (request.signal?.aborted) throw new Error("command cancelled before authorization");
-    if (!(await this.options.authorize(Object.freeze({ ...request })))) {
+    const decision = await this.options.authorize(Object.freeze({ ...request }));
+    const approved = typeof decision === "boolean" ? decision : decision.approved;
+    const explicitlyAuthorizedEnvironmentNames = typeof decision === "boolean" ? [] : [...new Set(decision.authorizedEnvironmentNames ?? [])];
+    const authorizableEnvironmentNames = new Set(this.options.authorizableEnvironmentNames ?? []);
+    if (explicitlyAuthorizedEnvironmentNames.some((name) => !authorizableEnvironmentNames.has(name))) {
+      throw new Error("Authorization requested an environment variable outside the trusted credential set");
+    }
+    if (!approved) {
       throw new Error("command denied by policy");
     }
     if (request.signal?.aborted) throw new Error("command cancelled before launch");
@@ -92,6 +108,7 @@ export class PolicyExecutor {
     }
     const identity = request.identity;
     const redactedCommand = redactExecutionText(request.command);
+    const effectiveEnvironmentAllowlist = [...new Set([...request.allowedEnvironment, ...explicitlyAuthorizedEnvironmentNames])];
     const commandSecrets = [
       ...Array.from(request.command.matchAll(/--?(?:api[-_]?key|token|secret|password)(?:=|\s+)["']?([^\s"']+)/gi), (match) => match[1]!),
       ...Array.from(request.command.matchAll(/\b[A-Z_]*(?:API_KEY|TOKEN|SECRET|PASSWORD)=([^\s]+)/gi), (match) => match[1]!),
@@ -99,13 +116,16 @@ export class PolicyExecutor {
     if (this.options.journal && identity) {
       this.options.journal.prepareExecution({
         ...identity,
-        redactedInput: { command: redactedCommand, cwd: request.cwd, allowedEnvironment: [...request.allowedEnvironment] },
+        redactedInput: { command: redactedCommand, cwd: request.cwd, allowedEnvironment: effectiveEnvironmentAllowlist },
       });
     }
 
     const env: NodeJS.ProcessEnv = {};
     const secrets: string[] = [];
-    for (const key of request.allowedEnvironment) {
+    const deniedEnvironmentNames = new Set(this.options.deniedEnvironmentNames ?? []);
+    const authorizedNames = new Set(explicitlyAuthorizedEnvironmentNames);
+    for (const key of effectiveEnvironmentAllowlist) {
+      if (deniedEnvironmentNames.has(key) && !authorizedNames.has(key)) continue;
       if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && process.env[key] !== undefined) {
         env[key] = process.env[key];
         if (/(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)/i.test(key) && process.env[key]) {

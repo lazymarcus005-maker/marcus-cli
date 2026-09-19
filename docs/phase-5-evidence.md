@@ -14,7 +14,7 @@ Status: **partial; phase gate not passed**
 
 ## Focused verification
 
-- State-store tests cover ledger/checkpoint persistence including unresolved executions in the durable checkpoint file, task snapshot restore, legacy migrations through schema v5, an injected transactional migration failure with successful retry, checkpoint source verification, single-writer locks, refusal to replay a completed Pi tool-call ID, and recovery pauses for explicitly unknown or cancelled side-effecting executions and already-unknown runs across repeated restarts. Explicit session resume compares the saved Git branch/HEAD baseline and pauses on mismatch or when legacy identity is unavailable. The pinned Node.js 24.21.0 full suite passes 120 tests; typecheck, build, and CLI smoke checks pass.
+- State-store tests cover ledger/checkpoint persistence including unresolved executions in the durable checkpoint file, task snapshot restore, legacy migrations through schema v5, an injected transactional migration failure with successful retry, checkpoint source verification, single-writer locks, refusal to replay a completed Pi tool-call ID, and recovery pauses for explicitly unknown or cancelled side-effecting executions and already-unknown runs across repeated restarts. Explicit session resume compares the saved Git branch/HEAD baseline and pauses on mismatch or when legacy identity is unavailable. The pinned Node.js 24.21.0 full suite passes 127 tests; typecheck, build, and CLI smoke checks pass.
 - Pi loopback tests cover manual compaction, one-dispatch request-budget rejection, overlapping prompt/compaction rejection, run cancellation, and persisted-session resume.
 - Focused state, graph, Pi runtime tests and typecheck passed during implementation.
 

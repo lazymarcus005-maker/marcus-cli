@@ -59,6 +59,70 @@ describe("bounded test execution and durable evidence", () => {
     store.close();
   });
 
+  it("applies trusted timeout, output, log, and environment bounds to test commands", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-test-settings-"));
+    roots.push(root);
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "macus@example.invalid"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Macus test"], { cwd: root });
+    await writeFile(join(root, "source.ts"), "export const stable = true;\n");
+    execFileSync("git", ["add", "source.ts"], { cwd: root });
+    execFileSync("git", ["commit", "-qm", "fixture"], { cwd: root });
+    const store = openStateStore(join(root, ".macus", "state", "state.db"));
+    store.createSession({ sessionId: "configured-runner", worktreeRoot: root, gitDirectory: join(root, ".git") });
+    const previous = process.env.MACUS_CONFIG_TEST_SECRET;
+    process.env.MACUS_CONFIG_TEST_SECRET = "not-forwarded";
+    try {
+      const execution = {
+        commandTimeoutMs: 500,
+        testBuildTimeoutMs: 30,
+        terminationGraceMs: 20,
+        maxOutputMemoryBytes: 1024,
+        maxLogBytes: 4096,
+        environmentAllowlist: ["PATH"],
+      };
+      const filtered = await runTestCommand({
+        root,
+        sessionId: "configured-runner",
+        command: "node -e 'process.stdout.write(process.env.MACUS_CONFIG_TEST_SECRET ?? \"missing\")'",
+        format: "unknown",
+        stateStore: store,
+        authorize: async () => true,
+        execution,
+        protectedCredentialEnvironmentNames: ["MACUS_CONFIG_TEST_SECRET"],
+      });
+      assert.equal(filtered.result.stdout, "missing");
+
+      const bounded = await runTestCommand({
+        root,
+        sessionId: "configured-runner",
+        command: "node -e 'process.stdout.write(\"x\".repeat(10000))'",
+        format: "unknown",
+        stateStore: store,
+        authorize: async () => true,
+        execution,
+      });
+      assert.equal(Buffer.byteLength(bounded.result.stdout, "utf8"), execution.maxOutputMemoryBytes);
+      assert.equal(bounded.result.outputComplete, false);
+      assert.equal(bounded.result.logTruncated, true);
+
+      const timedOut = await runTestCommand({
+        root,
+        sessionId: "configured-runner",
+        command: "node -e 'setTimeout(() => {}, 1000)'",
+        format: "unknown",
+        stateStore: store,
+        authorize: async () => true,
+        execution,
+      });
+      assert.equal(timedOut.result.timedOut, true);
+    } finally {
+      if (previous === undefined) delete process.env.MACUS_CONFIG_TEST_SECRET;
+      else process.env.MACUS_CONFIG_TEST_SECRET = previous;
+      store.close();
+    }
+  });
+
   it("rejects an unchanged pre-existing report even when its timestamp is in the future", async () => {
     const root = await mkdtemp(join(tmpdir(), "macus-stale-report-"));
     roots.push(root);

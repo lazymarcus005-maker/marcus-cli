@@ -23,6 +23,7 @@ import { buildCompactionInstructions, createDurableCheckpoint, reconcileDurableC
 import { inspectGit, type GitInspectionOperation } from "./workflow/git-inspection.js";
 import { formatReviewReport } from "./workflow/review-report.js";
 import { checkRepositoryResumeIdentity } from "./workflow/repository-identity.js";
+import type { ExecutionAuthorization } from "./execution/policy-executor.js";
 
 export interface CliDependencies {
   version?: string;
@@ -113,17 +114,29 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
   const onInterrupt = (): void => {
     void kernel?.cancel();
   };
-  const authorizeCommand = async (command: string, signal?: AbortSignal): Promise<boolean> => {
+  const authorizeCommand = async (command: string, credentialEnvironmentNames: readonly string[], signal?: AbortSignal): Promise<ExecutionAuthorization> => {
     console.error("\nApproval required for a model-requested operation.");
     console.error("Shell commands run locally with your account's permissions; Macus does not OS-sandbox them.");
     console.error("Review the exact operation and repository scripts before approving:");
     console.error(command);
     try {
-        const question = "Type 'yes' to approve this command (anything else denies): ";
-        const answer = signal
-          ? await input!.question(question, { signal })
-          : await input!.question(question);
-      return answer.trim() === "yes";
+      const question = "Type 'yes' to approve this command (anything else denies): ";
+      const answer = signal
+        ? await input!.question(question, { signal })
+        : await input!.question(question);
+      if (answer.trim() !== "yes") return false;
+      if (credentialEnvironmentNames.length === 0) return true;
+      console.error(`Trusted provider credentials are blocked by default. Effective non-secret environment allowlist: ${selection.execution.environmentAllowlist.join(", ") || "(empty)"}.`);
+      console.error(`Credential variable names (values are never displayed): ${credentialEnvironmentNames.join(", ")}`);
+      const credentialAnswer = signal
+        ? await input!.question("For this command only, enter exact credential variable names to pass, comma-separated (Enter keeps all blocked): ", { signal })
+        : await input!.question("For this command only, enter exact credential variable names to pass, comma-separated (Enter keeps all blocked): ");
+      const requested = credentialAnswer.split(",").map((name) => name.trim()).filter(Boolean);
+      if (requested.some((name) => !credentialEnvironmentNames.includes(name))) {
+        console.error("Unknown credential variable name; command denied.");
+        return false;
+      }
+      return { approved: true, authorizedEnvironmentNames: [...new Set(requested)] };
     } catch {
       return false;
     }
@@ -210,6 +223,8 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
         stdout.write(`Global config: ${globalConfigPath}\nProject config: ${join(cwd, ".macus", "config.yaml")}\n`);
         stdout.write(`Model: ${selection.alias} (${selection.providerId}/${selection.model}); aliasSource=${selection.aliasSource}; profile=${selection.profile}; endpoint/credential=global trusted config\n`);
         stdout.write(`Limits: context=${selection.contextWindow}; maxInput=${selection.maxInputTokens ?? "unset"}; maxOutput=${selection.maxOutputTokens}; reservedOutput=${selection.reservedOutputTokens}; safetyMargin=${selection.safetyMarginTokens}; promptCap=${promptLimitForModel(selection)}\n`);
+        stdout.write(`Execution: commandTimeoutMs=${selection.execution.commandTimeoutMs}; testBuildTimeoutMs=${selection.execution.testBuildTimeoutMs}; terminationGraceMs=${selection.execution.terminationGraceMs}; maxOutputMemoryBytes=${selection.execution.maxOutputMemoryBytes}; maxLogBytes=${selection.execution.maxLogBytes}; environmentAllowlist=${selection.execution.environmentAllowlist.join(",")}\n`);
+        stdout.write(`Logs: retentionDays=${selection.logs.retentionDays}; maxTotalBytes=${selection.logs.maxTotalBytes}\n`);
         stdout.write(`Features: repo_map=${selection.features.repoMap}; code_graph=${selection.features.codeGraph}; context_ledger=${selection.features.contextLedger}; checkpoint=${selection.features.checkpoint}; git_context=${selection.features.gitContext}; task_engine=${selection.features.taskEngine}; auto_compaction=false\n`);
         stdout.write("Credentials and provider URLs are intentionally not displayed. Settings editing is not available; edit the user-owned YAML files directly.\n");
       } else if (command.startsWith("/model ")) {
@@ -409,7 +424,11 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
             ...(match[1] !== "node-json" && match[2] ? { reportPath: match[2] } : {}),
             format: match[1] as "node-json" | "junit" | "trx" | "unknown",
             stateStore,
-            authorize: (request) => authorizeCommand(`${request.command}\nWorking directory: ${request.cwd}\nTimeout: ${request.timeoutMs} ms`, request.signal),
+            execution: selection.execution,
+            logs: selection.logs,
+            ...(selection.protectedCredentialEnvironmentNames.length ? { protectedCredentialEnvironmentNames: selection.protectedCredentialEnvironmentNames } : {}),
+            ...(selection.credentialEnvironmentNames.length ? { credentialEnvironmentNames: selection.credentialEnvironmentNames } : {}),
+            authorize: (request) => authorizeCommand(`${request.command}\nWorking directory: ${request.cwd}\nTimeout: ${request.timeoutMs} ms`, selection.credentialEnvironmentNames, request.signal),
           });
           stdout.write(`Test evidence ${testResult.evidenceId}: ${testResult.evidence.status} (${testResult.evidence.tests ?? "unknown"} tests, ${testResult.evidence.passed ?? "unknown"} passed, ${testResult.evidence.failed ?? "unknown"} failed).\n`);
           if (testResult.evidence.reason) stdout.write(`${testResult.evidence.reason}\n`);

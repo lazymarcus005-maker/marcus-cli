@@ -149,4 +149,33 @@ describe("trusted model configuration", () => {
     const excessive = configured.replace("repo_map_tokens: 256", "repo_map_tokens: 20001");
     assert.throws(() => resolveTrustedModelSelection(excessive, undefined, env), /must not exceed 20000/);
   });
+
+  it("resolves bounded execution settings from trusted global config", () => {
+    const configured = globalConfig.replace(
+      "context:\n",
+      "execution:\n  command_timeout_seconds: 7\n  test_build_timeout_seconds: 11\n  termination_grace_seconds: 3\n  max_output_memory_bytes: 4096\n  max_log_bytes: 8192\n  environment_allowlist: [PATH, LANG, MACUS_MODEL_API_KEY, SECONDARY_MODEL_KEY]\nlogs:\n  retention_days: 5\n  max_total_bytes: 16384\ncontext:\n",
+    ).replace(
+      "  aliases:\n    primary: private_gateway",
+      "    secondary_gateway:\n      protocol: openai-compatible\n      base_url: https://secondary.example/v1\n      api_key_env: SECONDARY_MODEL_KEY\n      profile: standard\n      model: model-b\n  aliases:\n    primary: private_gateway\n    secondary: secondary_gateway",
+    );
+    const selected = resolveTrustedModelSelection(configured, undefined, {
+      MACUS_MODEL_BASE_URL: "https://gateway.example/v1",
+      MACUS_MODEL_API_KEY: "secret-test-value",
+    });
+    assert.deepEqual(selected.execution, {
+      commandTimeoutMs: 7000,
+      testBuildTimeoutMs: 11000,
+      terminationGraceMs: 3000,
+      maxOutputMemoryBytes: 4096,
+      maxLogBytes: 8192,
+      environmentAllowlist: ["PATH", "LANG"],
+    });
+    assert.deepEqual(selected.protectedCredentialEnvironmentNames, ["MACUS_MODEL_API_KEY", "SECONDARY_MODEL_KEY"]);
+    assert.deepEqual(selected.credentialEnvironmentNames, ["MACUS_MODEL_API_KEY"]);
+    assert.deepEqual(selected.logs, { retentionDays: 5, maxTotalBytes: 16384 });
+    assert.throws(() => resolveTrustedModelSelection(configured, "execution:\n  command_timeout_seconds: 1\n", {
+      MACUS_MODEL_BASE_URL: "https://gateway.example/v1",
+      MACUS_MODEL_API_KEY: "secret-test-value",
+    }), /unsupported field execution/);
+  });
 });

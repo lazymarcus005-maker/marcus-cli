@@ -15,6 +15,7 @@ import { createRequestBudgetGuard, type RequestManifest, type RequestManifestCon
 import { resolveRepositoryInstructions } from "../context/instructions.js";
 import { prepareWorkingSetRequest } from "../context/working-set-runtime.js";
 import { createPolicyShellTool } from "../execution/pi-shell-tool.js";
+import type { ExecutionAuthorization } from "../execution/policy-executor.js";
 import { createRepositoryTools } from "../execution/repository-tools.js";
 import type { StateStore } from "../state/state-store.js";
 import { readGitContext } from "../workflow/git-context.js";
@@ -103,7 +104,7 @@ export class PiAgentKernel {
     private readonly selection: TrustedModelSelection,
     hooks?: KernelHooks,
     private readonly stateStore?: StateStore,
-    private readonly authorizeCommand: (command: string, signal?: AbortSignal) => Promise<boolean> = async () => false,
+    private readonly authorizeCommand: (command: string, credentialEnvironmentNames: readonly string[], signal?: AbortSignal) => Promise<ExecutionAuthorization> = async () => false,
   ) {
     const prepareBudgetedRequest = hooks?.prepareProviderRequest ?? createRequestBudgetGuard(
       selection,
@@ -279,6 +280,10 @@ export class PiAgentKernel {
           sessionId: () => this.session?.sessionId,
           runId: () => this.activeRun?.runId,
           authorizeCommand: this.authorizeCommand,
+          execution: this.selection.execution,
+          logs: this.selection.logs,
+          ...(this.selection.protectedCredentialEnvironmentNames.length ? { protectedCredentialEnvironmentNames: this.selection.protectedCredentialEnvironmentNames } : {}),
+          ...(this.selection.credentialEnvironmentNames.length ? { credentialEnvironmentNames: this.selection.credentialEnvironmentNames } : {}),
           }),
           ...createRepositoryTools({
             cwd: this.cwd,
@@ -287,7 +292,10 @@ export class PiAgentKernel {
             runId: () => this.activeRun?.runId,
             codeGraph: this.selection.features.codeGraph,
             gitContext: this.selection.features.gitContext,
-            authorizeWrite: this.authorizeCommand,
+            authorizeWrite: async (summary, signal) => {
+              const authorization = await this.authorizeCommand(summary, [], signal);
+              return typeof authorization === "boolean" ? authorization : authorization.approved;
+            },
           }),
         ]
       : [];

@@ -1,7 +1,19 @@
 import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
+import {
+  DEFAULT_ENVIRONMENT_ALLOWLIST,
+  DEFAULT_EXECUTION_SETTINGS,
+  DEFAULT_LOG_SETTINGS,
+  EXECUTION_LIMIT_MAXIMUMS,
+  LOG_LIMIT_MAXIMUMS,
+  type ExecutionSettings,
+  type LogSettings,
+} from "../execution/execution-settings.js";
 
 type RecordValue = Record<string, unknown>;
+
+export type TrustedExecutionSettings = ExecutionSettings;
+export type TrustedLogSettings = LogSettings;
 
 export interface TrustedModelSelection {
   alias: string;
@@ -10,6 +22,8 @@ export interface TrustedModelSelection {
   protocol: "openai-compatible" | "openrouter" | "litellm" | "local";
   baseUrl: string;
   apiKey: string | undefined;
+  protectedCredentialEnvironmentNames: string[];
+  credentialEnvironmentNames: string[];
   profile: string;
   model: string;
   contextWindow: number;
@@ -19,6 +33,8 @@ export interface TrustedModelSelection {
   safetyMarginTokens: number;
   contextBudgets?: { repoMapTokens?: number; searchResultsTokens?: number; toolOutputTokens?: number; singleFileReadTokens?: number };
   runLimits: { maxModelTurns: number; maxNoProgressAttempts: number; maxDurationSeconds: number };
+  execution: TrustedExecutionSettings;
+  logs: TrustedLogSettings;
   features: { repoMap: boolean; codeGraph: boolean; contextLedger: boolean; checkpoint: boolean; gitContext: boolean; taskEngine: boolean };
 }
 
@@ -96,6 +112,13 @@ function positiveInteger(value: unknown, location: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
     throw new ModelConfigurationError(`${location} must be a positive integer`);
   }
+  return value;
+}
+
+function boundedConfiguredInteger(config: RecordValue, section: string, key: string, fallback: number, maximum: number): number {
+  const configured = config[key];
+  const value = configured === undefined ? fallback : positiveInteger(configured, `${section}.${key}`);
+  if (value > maximum) throw new ModelConfigurationError(`${section}.${key} must not exceed ${maximum}`);
   return value;
 }
 
@@ -246,6 +269,11 @@ export function resolveTrustedModelSelection(
   }
   const profile = provider.profile;
   const model = provider.model;
+  const protectedCredentialEnvironmentNames = [...new Set(Object.values(providers).flatMap((value) => {
+    const configuredProvider = record(value, "Trusted provider");
+    return typeof configuredProvider.api_key_env === "string" ? [configuredProvider.api_key_env] : [];
+  }))];
+  const credentialEnvironmentNames = typeof provider.api_key_env === "string" ? [provider.api_key_env] : [];
   if (typeof profile !== "string" || !profile || typeof model !== "string" || !model) {
     throw new ModelConfigurationError(`Trusted provider ${providerId} requires profile and model`);
   }
@@ -329,6 +357,25 @@ export function resolveTrustedModelSelection(
     maxNoProgressAttempts: runConfig.max_no_progress_attempts === undefined ? 3 : positiveInteger(runConfig.max_no_progress_attempts, "run.max_no_progress_attempts"),
     maxDurationSeconds: runConfig.max_duration_seconds === undefined ? 1800 : positiveInteger(runConfig.max_duration_seconds, "run.max_duration_seconds"),
   };
+  const executionConfig = globalConfig.execution === undefined ? {} : record(globalConfig.execution, "execution");
+  const configuredEnvironmentAllowlist = executionConfig.environment_allowlist === undefined
+    ? [...DEFAULT_ENVIRONMENT_ALLOWLIST]
+    : [...new Set(executionConfig.environment_allowlist as string[])];
+  const credentialEnvironmentNameSet = new Set(protectedCredentialEnvironmentNames);
+  const environmentAllowlist = configuredEnvironmentAllowlist.filter((name) => !credentialEnvironmentNameSet.has(name));
+  const execution = {
+    commandTimeoutMs: boundedConfiguredInteger(executionConfig, "execution", "command_timeout_seconds", DEFAULT_EXECUTION_SETTINGS.commandTimeoutMs / 1000, EXECUTION_LIMIT_MAXIMUMS.commandTimeoutSeconds) * 1000,
+    testBuildTimeoutMs: boundedConfiguredInteger(executionConfig, "execution", "test_build_timeout_seconds", DEFAULT_EXECUTION_SETTINGS.testBuildTimeoutMs / 1000, EXECUTION_LIMIT_MAXIMUMS.testBuildTimeoutSeconds) * 1000,
+    terminationGraceMs: boundedConfiguredInteger(executionConfig, "execution", "termination_grace_seconds", DEFAULT_EXECUTION_SETTINGS.terminationGraceMs / 1000, EXECUTION_LIMIT_MAXIMUMS.terminationGraceSeconds) * 1000,
+    maxOutputMemoryBytes: boundedConfiguredInteger(executionConfig, "execution", "max_output_memory_bytes", DEFAULT_EXECUTION_SETTINGS.maxOutputMemoryBytes, EXECUTION_LIMIT_MAXIMUMS.maxOutputMemoryBytes),
+    maxLogBytes: boundedConfiguredInteger(executionConfig, "execution", "max_log_bytes", DEFAULT_EXECUTION_SETTINGS.maxLogBytes, EXECUTION_LIMIT_MAXIMUMS.maxLogBytes),
+    environmentAllowlist,
+  };
+  const logsConfig = globalConfig.logs === undefined ? {} : record(globalConfig.logs, "logs");
+  const logs = {
+    retentionDays: boundedConfiguredInteger(logsConfig, "logs", "retention_days", DEFAULT_LOG_SETTINGS.retentionDays, LOG_LIMIT_MAXIMUMS.retentionDays),
+    maxTotalBytes: boundedConfiguredInteger(logsConfig, "logs", "max_total_bytes", DEFAULT_LOG_SETTINGS.maxTotalBytes, LOG_LIMIT_MAXIMUMS.maxTotalBytes),
+  };
   const featureDefaults = { repo_map: true, code_graph: false, context_ledger: true, checkpoint: true, git_context: true, task_engine: true };
   const globalFeatures = globalConfig.features === undefined ? {} : record(globalConfig.features, "Global config.features");
   const projectFeatures = projectConfig?.features === undefined ? {} : record(projectConfig.features, "Project config.features");
@@ -367,6 +414,8 @@ export function resolveTrustedModelSelection(
     protocol,
     baseUrl: interpolateTrustedUrl(provider.base_url, env),
     apiKey,
+    protectedCredentialEnvironmentNames,
+    credentialEnvironmentNames,
     profile,
     model,
     contextWindow,
@@ -375,6 +424,8 @@ export function resolveTrustedModelSelection(
     reservedOutputTokens,
     safetyMarginTokens,
     runLimits,
+    execution,
+    logs,
     features,
     ...(Object.keys(contextBudgets).length ? { contextBudgets } : {}),
   };

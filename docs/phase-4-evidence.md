@@ -10,6 +10,7 @@ Status: **in progress; gate not passed**
 - Before each coding prompt, changed Git paths are reconciled against their latest durable source hashes. Unrecorded differences are attributed `external_or_unknown`, related working-set fragments are marked stale, and passing test evidence is atomically invalidated. Recorded agent/shell changes also stale related fragments and passing evidence. In-session branch/HEAD mismatches stale all working-set fragments and passing evidence, then block the prompt pending a new session.
 - Bounded `/git diff|log|show|blame` and a journaled agent `git_inspect` tool use fixed argument forms, repository-contained paths, cancellation, a 10-second subprocess limit, and 32 KiB model-facing output. Agent writes record old/new hashes; shell-observed worktree changes are explicitly `external_or_unknown`.
 - `/test node-json -- COMMAND`, `/test junit|trx REPORT_PATH -- COMMAND`, and `/test unknown -- COMMAND` run through approval, the execution journal, timeout and output bounds. Parsed counts are persisted with command, timing, exit/signal, cancellation/timeout, output completeness and snapshot identity. Unknown runners are recorded with status `unknown`, never passed. Commands are redacted before evidence persistence.
+- Trusted global execution/log settings now reach the shell and test runners: command/test timeouts, termination grace, in-memory and spool caps, environment allowlist, retention, and aggregate log limits are applied. Every trusted provider API-key environment variable is stripped even if listed in the allowlist. Project attempts to add execution/log settings remain rejected.
 - `/review` reports Changed, Tested, Remaining Risk, and Unresolved Issue from current Git context and durable test/run/task/execution records. It explicitly warns that the bounded report is not semantic code review.
 - Empty, malformed, partial, timed-out, cancelled, stale-snapshot, unparseable and non-Git snapshot cases cannot produce a passing evidence status. JUnit/TRX sidecar reports must also have a changed file identity during the run; an unchanged valid report (including one with a future timestamp) remains unknown.
 - Prompts and compaction are refused at the kernel boundary while an execution outcome is unresolved.
@@ -23,7 +24,7 @@ node node_modules/tsx/dist/cli.mjs --test test/git-context.test.ts test/test-evi
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
 ```
 
-Focused verification under Node.js 24.21.0 passes; the full suite currently passes 120 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
+Focused verification under Node.js 24.21.0 passes; the full suite currently passes 127 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
 
 ## Open gate items
 

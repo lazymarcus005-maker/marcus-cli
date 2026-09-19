@@ -6,6 +6,7 @@ import { ExecutionLogStore } from "../execution/execution-log-store.js";
 import type { StateStore } from "../state/state-store.js";
 import { readGitContext } from "./git-context.js";
 import { evaluateTestEvidence, type TestReportFormat } from "./test-evidence.js";
+import { defaultExecutionSettings, defaultLogSettings, type ExecutionSettings, type LogSettings } from "../execution/execution-settings.js";
 
 function isWithin(root: string, path: string): boolean {
   const rel = relative(root, path);
@@ -32,6 +33,10 @@ export async function runTestCommand(input: {
   format: TestReportFormat;
   stateStore: StateStore;
   authorize: ConstructorParameters<typeof PolicyExecutor>[0]["authorize"];
+  execution?: ExecutionSettings;
+  logs?: LogSettings;
+  protectedCredentialEnvironmentNames?: readonly string[];
+  credentialEnvironmentNames?: readonly string[];
   signal?: AbortSignal;
 }): Promise<{ evidenceId: string; result: Awaited<ReturnType<PolicyExecutor["execute"]>>; evidence: ReturnType<typeof evaluateTestEvidence> }> {
   const root = await realpath(input.root);
@@ -41,17 +46,27 @@ export async function runTestCommand(input: {
   const startedAt = Date.now();
   const before = await readGitContext(root);
   const reportBefore = await reportFingerprint(reportPath);
+  const execution = input.execution ?? defaultExecutionSettings();
+  const logs = input.logs ?? defaultLogSettings();
   const executor = new PolicyExecutor({
     authorize: input.authorize,
+    maxOutputBytes: execution.maxOutputMemoryBytes,
+    ...(input.protectedCredentialEnvironmentNames ? { deniedEnvironmentNames: input.protectedCredentialEnvironmentNames } : {}),
+    ...(input.credentialEnvironmentNames ? { authorizableEnvironmentNames: input.credentialEnvironmentNames } : {}),
     journal: input.stateStore,
-    logStore: new ExecutionLogStore(root),
+    logStore: new ExecutionLogStore(root, {
+      maxExecutionBytes: execution.maxLogBytes,
+      maxTotalBytes: logs.maxTotalBytes,
+      retentionDays: logs.retentionDays,
+    }),
   });
   const executionId = randomUUID();
   const result = await executor.execute({
     command: input.command,
     cwd: root,
-    timeoutMs: 600_000,
-    allowedEnvironment: ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL"],
+    timeoutMs: execution.testBuildTimeoutMs,
+    terminationGraceMs: execution.terminationGraceMs,
+    allowedEnvironment: execution.environmentAllowlist,
     ...(input.signal ? { signal: input.signal } : {}),
     identity: { executionId, sessionId: input.sessionId, ...(input.runId ? { runId: input.runId } : {}), effectClass: "test-build" },
   });

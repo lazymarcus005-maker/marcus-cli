@@ -54,6 +54,44 @@ describe("policy-controlled command execution", () => {
     );
   });
 
+  it("passes trusted credentials only after exact per-command authorization", async () => {
+    const cwd = await fixtureDirectory();
+    const prior = process.env.MACUS_EXPLICIT_TEST_KEY;
+    process.env.MACUS_EXPLICIT_TEST_KEY = "credential-value";
+    try {
+      const executor = new PolicyExecutor({
+        authorize: async () => ({ approved: true, authorizedEnvironmentNames: ["MACUS_EXPLICIT_TEST_KEY"] }),
+        deniedEnvironmentNames: ["MACUS_EXPLICIT_TEST_KEY"],
+        authorizableEnvironmentNames: ["MACUS_EXPLICIT_TEST_KEY"],
+      });
+      const result = await executor.execute({
+        command: `${process.execPath} -e "process.stdout.write(process.env.MACUS_EXPLICIT_TEST_KEY || 'blocked')"`,
+        cwd,
+        timeoutMs: 5000,
+        allowedEnvironment: ["PATH"],
+      });
+      assert.equal(result.stdout, "[REDACTED]");
+    } finally {
+      if (prior === undefined) delete process.env.MACUS_EXPLICIT_TEST_KEY;
+      else process.env.MACUS_EXPLICIT_TEST_KEY = prior;
+    }
+  });
+
+  it("rejects authorization for an environment name outside the trusted credential set", async () => {
+    const cwd = await fixtureDirectory();
+    const executor = new PolicyExecutor({
+      authorize: async () => ({ approved: true, authorizedEnvironmentNames: ["PATH"] }),
+      deniedEnvironmentNames: ["TRUSTED_KEY"],
+      authorizableEnvironmentNames: ["TRUSTED_KEY"],
+    });
+    await assert.rejects(executor.execute({
+      command: "true",
+      cwd,
+      timeoutMs: 1000,
+      allowedEnvironment: [],
+    }), /outside the trusted credential set/);
+  });
+
   it("bounds captured output and identifies incomplete capture", async () => {
     const cwd = await fixtureDirectory();
     const executor = new PolicyExecutor({
