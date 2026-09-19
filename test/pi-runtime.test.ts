@@ -88,7 +88,8 @@ async function hangingProvider(): Promise<{ baseUrl: string; waitForRequest: () 
   return { baseUrl: `http://127.0.0.1:${address.port}/v1`, waitForRequest: () => requestSeen, waitForClose: () => connectionClosed, wasClosed: () => closed };
 }
 
-async function providerHangingOnCompaction(): Promise<{ baseUrl: string; waitForCompaction: () => Promise<void>; waitForCompactionClose: () => Promise<void>; wasCompactionClosed: () => boolean; requests: () => number; bodies: () => string[] }> {  let requestCount = 0;
+async function providerHangingOnCompaction(): Promise<{ baseUrl: string; waitForCompaction: () => Promise<void>; waitForCompactionClose: () => Promise<void>; wasCompactionClosed: () => boolean; requests: () => number; bodies: () => string[] }> {
+  let requestCount = 0;
   const bodies: string[] = [];
   let requested!: () => void;
   let markClosed!: () => void;

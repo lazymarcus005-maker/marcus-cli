@@ -152,6 +152,7 @@ async function main(): Promise<void> {
 
   // One committed workspace up front pins the deterministic starting revision.
   const revisionWorkspace = await prepareCommittedWorkspace();
+  temporaryRoots.push(revisionWorkspace);
   const startingRevision = execFileSync("git", ["-C", revisionWorkspace, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 
   const scenario: BenchmarkScenario = {
@@ -170,10 +171,10 @@ async function main(): Promise<void> {
     conditions: CONDITIONS,
     repetitions: REPETITIONS,
     runtime: `paired-loopback/${process.version}`,
-    prepareWorkspace: async () => {
-      await prepareCommittedWorkspace();
-    },
-    run: async ({ system, repetition }) => {
+    // Workspaces are prepared inside run() so each system gets its own
+    // disposable copy; the harness's prepare phase stays a no-op.
+    prepareWorkspace: async () => undefined,
+    run: async ({ system }) => {
       const cwd = await prepareCommittedWorkspace();
       const observedRevision = execFileSync("git", ["-C", cwd, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
       if (observedRevision !== startingRevision) throw new Error("Workspace starting revision diverged from the scenario revision");
@@ -212,8 +213,6 @@ async function main(): Promise<void> {
   console.log(`Runs: ${report.rawRuns.length} (${passed} passed, ${report.rawRuns.length - passed} not passed)`);
   console.log(`Correctness-first status: ${report.correctnessFirst.status}`);
   console.log(`Report written to ${outputPath}`);
-
-  await rm(revisionWorkspace, { recursive: true, force: true });
 }
 
 try {

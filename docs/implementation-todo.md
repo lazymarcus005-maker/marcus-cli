@@ -21,5 +21,5 @@ Implement the approved GitHub tickets in dependency order. Ticket numbers refer 
 - [x] #17 Safe full compaction and stage-aware optimization
 - [x] #18 Lightweight relationship graph and impact fallback
 - [x] #19 Recovery and schema-migration hardening
-- [x] #20 Paired benchmark and quality-regression report
+- [ ] #20 Paired benchmark and quality-regression report
 - [ ] #21 Clean installation and final release audit
