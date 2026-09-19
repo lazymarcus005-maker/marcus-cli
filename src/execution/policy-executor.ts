@@ -139,6 +139,11 @@ export class PolicyExecutor {
     const beforeGit = identity && this.options.journal?.recordSourceChange
       ? await readGitContext(request.cwd)
       : undefined;
+    if (request.signal?.aborted) {
+      await log?.abort();
+      if (identity) this.options.journal?.recordExecutionEvent(identity.executionId, "failed", { reason: "cancelled before process launch" });
+      throw new Error("command cancelled before launch");
+    }
     const child = spawn(request.command, {
       cwd: request.cwd,
       env,

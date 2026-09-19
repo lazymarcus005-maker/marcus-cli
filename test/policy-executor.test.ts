@@ -119,6 +119,47 @@ describe("policy-controlled command execution", () => {
     await assert.rejects(readFile(join(cwd, "launched-after-cancel")), { code: "ENOENT" });
   });
 
+  it("does not spawn after cancellation while allocating the execution log", async () => {
+    const cwd = await fixtureDirectory();
+    const controller = new AbortController();
+    const store = openStateStore(join(cwd, ".macus", "state", "state.db"));
+    store.createSession({ sessionId: "cancel-during-prepare", worktreeRoot: cwd, gitDirectory: null });
+    class AbortDuringLogCreation extends ExecutionLogStore {
+      override async create(sessionId: string, executionId: string, secrets: string[] = []) {
+        controller.abort();
+        return super.create(sessionId, executionId, secrets);
+      }
+    }
+    const statuses: string[] = [];
+    const executor = new PolicyExecutor({
+      authorize: async () => true,
+      journal: {
+        prepareExecution: (input) => store.prepareExecution(input),
+        recordExecutionEvent: (executionId, status, payload) => {
+          statuses.push(status);
+          store.recordExecutionEvent(executionId, status, payload);
+        },
+      },
+      logStore: new AbortDuringLogCreation(cwd),
+    });
+    try {
+      await assert.rejects(executor.execute({
+        command: `${process.execPath} -e "require('fs').writeFileSync('should-not-launch', 'bad')"`,
+        cwd,
+        timeoutMs: 5000,
+        allowedEnvironment: ["PATH"],
+        signal: controller.signal,
+        identity: { executionId: "cancel-before-spawn", sessionId: "cancel-during-prepare", effectClass: "external" },
+      }), /cancelled before launch/);
+      assert.deepEqual(statuses, ["failed"]);
+      assert.equal(store.getExecutionStatus("cancel-before-spawn"), "failed");
+      assert.deepEqual(store.listUnresolvedExecutions("cancel-during-prepare"), []);
+      await assert.rejects(readFile(join(cwd, "should-not-launch")), { code: "ENOENT" });
+    } finally {
+      store.close();
+    }
+  });
+
   it("passes trusted credentials only after exact per-command authorization", async () => {
     const cwd = await fixtureDirectory();
     const prior = process.env.MACUS_EXPLICIT_TEST_KEY;

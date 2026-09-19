@@ -14,6 +14,7 @@ Status: **in progress; gate not passed**
 - `/review` reports Changed, Tested, Remaining Risk, and Unresolved Issue from current Git context and durable test/run/task/execution records; missing test-command evidence is identified as `not_run`. It explicitly warns that the bounded report is not semantic code review.
 - Empty, malformed, partial, timed-out, cancelled, stale-snapshot, unparseable and non-Git snapshot cases cannot produce a passing evidence status. TRX results additionally require a recognized completed/failed run outcome and internally consistent outcome counters; error/timeout counters count as failures, while incomplete or contradictory summaries remain unknown. JUnit/TRX sidecar reports must also have a changed file identity during the run; an unchanged valid report (including one with a future timestamp) remains unknown.
 - Prompts and compaction are refused at the kernel boundary while an execution outcome is unresolved.
+- The executor rechecks cancellation after asynchronous log allocation and immediately before spawn. A cancellation in that boundary records a confirmed prelaunch failure and prevents the side effect; the regression is covered in `test/policy-executor.test.ts`.
 
 ## Focused verification
 
@@ -24,7 +25,7 @@ node node_modules/tsx/dist/cli.mjs --test test/git-context.test.ts test/test-evi
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
 ```
 
-Focused verification under Node.js 24.21.0 passes; the full suite currently passes 134 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
+Focused verification under Node.js 24.21.0 passes; the full suite currently passes 140 tests. Typecheck, build and CLI help/version smoke checks pass. Live endpoint and cross-platform gates still remain.
 
 ## Open gate items
 

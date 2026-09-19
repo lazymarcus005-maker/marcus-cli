@@ -13,7 +13,7 @@ Status: **in progress; gate not passed**
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Current automated suite | `npm test` | 139 passed, 0 failed (2026-09-19); deterministic local providers only |
+| Current automated suite | `npm test` | 140 passed, 0 failed (2026-09-19); deterministic local providers only |
 | Pi protocol and recovery checks | `npx tsx --test test/pi-runtime.test.ts` | 20 passed, 0 failed; nested tool-call and tool-result IDs form a correctly ordered protocol group; streaming, cancellation, compaction, dispose/replacement, and resume checks run against the deterministic local provider |
 | Stale-edit preservation | `npx tsx --test test/safe-edit.test.ts` | 2 passed; an external edit is byte-for-byte retained when a stale replacement is rejected (2026-09-19) |
 | Typecheck/build/package | `npm run typecheck`, `npm run build`, `npm pack --dry-run`, install the tarball in a clean prefix, then run packaged `macus --help` and `--version` with Node.js 24.21.0 | Passed on macOS arm64 (2026-09-19; tarball contains runtime artifacts, not compiled tests; version `0.1.0`) |
@@ -27,6 +27,7 @@ Status: **in progress; gate not passed**
 - Complete Pi compatibility evidence for explicit unavailable-capability failures and session replacement; streaming, nested tool turn, cancellation, manual compaction, instruction injection, and request-budget rejection have loopback-provider tests.
 - Complete centralized read/write/tool authorization and bounded-output policy; interrupted runs and execution intents are journaled and gated, but full crash-point reconciliation and user-change preservation remain open.
 - Explicitly unknown executions and cancelled side-effecting commands now keep recovery paused; reused Pi tool-call IDs are refused to prevent replay after a durable result but before transcript completion.
+- The executor rechecks cancellation after asynchronous log allocation and before spawn; cancellation there records a confirmed prelaunch failure, leaves no unresolved effect, and does not run the command (covered by `test/policy-executor.test.ts`).
 - Hash-checked replacement rejects stale source and verifies that the externally edited bytes remain unchanged; concurrent filesystem races beyond the final hash check remain open.
 - Normal CLI startup continues the recent Pi session and verifies repository identity, preventing a process restart from silently creating a clean session around unresolved work. A focused executor test confirms that a successful file side effect followed by failed result persistence is recorded as unknown and remains a recovery gate.
 - Run the authorized configured-endpoint checks; current execution/log unit tests cover 8 MiB in-memory / 100 MiB spool limits, bounded session-scoped log access, retention and aggregate limits.
