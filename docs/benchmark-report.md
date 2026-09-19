@@ -13,10 +13,10 @@ compatibility or performance result, and it must not be read as one.
 ## Run identity
 
 - Report file: `docs/benchmark/loopback-paired-report.json` (raw observations and distributions)
-- Benchmark ID: `c8e641ba-fbec-4a82-9bb4-ac8fef737d30`
-- Recorded at: 2026-09-19T16:12:49.570Z (local +0700)
+- Benchmark ID: `585ebd0e-2672-4bca-a654-e69ebe82b8ff`
+- Recorded at: 2026-09-19T16:28:37.810Z (local +0700)
 - Runtime: Node.js v24.21.0 (the pinned runtime), macOS arm64 (Darwin 25.6.0, Mac mini M4 Pro 48 GB — the §39 reference hardware)
-- Code snapshot: commit `362f803` (`Cover compaction and migration crash boundaries in recovery tests`)
+- Code snapshot: commit `28fb328` (`Address review: split joined line, scope benchmark prep, uncheck partial ticket`)
 - Endpoint: loopback OpenAI-compatible SSE fixture on `127.0.0.1`; no external state was contacted
 - Scenario: `loopback-bash-append-edit` — append a marker comment to `app.ts` via the shell
 - Starting revision: `75a75cae9ad8994b5c3eb26321add823e4b6d924` (identical across all workspaces; fixed author/dates)
@@ -37,14 +37,14 @@ compatibility or performance result, and it must not be read as one.
 
 | System | Rep | Input tokens | Cached | Uncached | Output | Tool calls | Wall ms | Peak context |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| unmodified_pi | 0 | 41 | 11 | 30 | 12 | 1 | 66 | 24 |
-| macus | 0 | 41 | 11 | 30 | 12 | 1 | 98 | 24 |
-| macus | 1 | 41 | 11 | 30 | 12 | 1 | 83 | 24 |
+| unmodified_pi | 0 | 41 | 11 | 30 | 12 | 1 | 61 | 24 |
+| macus | 0 | 41 | 11 | 30 | 12 | 1 | 79 | 24 |
+| macus | 1 | 41 | 11 | 30 | 12 | 1 | 77 | 24 |
 | unmodified_pi | 1 | 41 | 11 | 30 | 12 | 1 | 6 | 24 |
-| unmodified_pi | 2 | 41 | 11 | 30 | 12 | 1 | 11 | 24 |
-| macus | 2 | 41 | 11 | 30 | 12 | 1 | 91 | 24 |
+| unmodified_pi | 2 | 41 | 11 | 30 | 12 | 1 | 6 | 24 |
+| macus | 2 | 41 | 11 | 30 | 12 | 1 | 75 | 24 |
 
-Distributions (median): wall time unmodified_pi 10.8 ms, macus 91.1 ms. The
+Distributions (median): wall time unmodified_pi 6.1 ms, macus 77.1 ms. The
 Macus kernel adds durable-state, policy, and budget work per run, and the
 unmodified-Pi times are dominated by loopback latency; these values are
 recorded observations of a synthetic fixture, not a performance comparison.
