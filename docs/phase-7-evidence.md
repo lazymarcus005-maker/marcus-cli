@@ -23,7 +23,8 @@ Status: **not passed; release audit remains incomplete**
 
 ## Remaining release blockers
 
-- `.github/workflows/ci.yml` defines Ubuntu 24.04 and macOS 15 arm64 jobs, including tarball install smoke checks. The first hosted runs failed only because the macOS runner lacked `rg`; the workflow now installs ripgrep on both runners and awaits a green hosted run as evidence.
+- ~~Hosted CI evidence~~ — hosted run `35455212152` is green on both platforms (see above).
+- `.github/workflows/ci.yml` defines Ubuntu 24.04 and macOS 15 arm64 jobs, including tarball install smoke checks. The first hosted runs failed only because the macOS runner lacked `rg`; after the workflow began installing ripgrep on both runners, hosted run `35455212152` completed green on `ubuntu-24.04` and `macos-15` against commit `abb2414` (tests, typecheck, build, license inventory, packed-CLI smoke checks).
 - No authorized live provider endpoint is configured; live compatibility is not claimed.
 - One controlled paired Macus-versus-unmodified-Pi run has been recorded on the deterministic loopback provider on the reference hardware (three order-alternated pairs; correctness and recovery oracles passed; no regression). See [benchmark-report.md](benchmark-report.md) and [benchmark-protocol.md](benchmark-protocol.md). A live-endpoint paired measurement and the 10,000-file reference-fixture run remain open.
 - Phase gates 1–6 are not all green. Several compatibility, race/fault-injection, and large-repository performance cases remain explicitly open in their evidence files.
