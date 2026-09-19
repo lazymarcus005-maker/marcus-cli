@@ -101,6 +101,7 @@ export async function runTestCommand(input: {
     snapshotDigest: evidence.snapshotDigest,
     status: evidence.status,
     payload: {
+      executionId,
       command: redactExecutionText(input.command),
       cwd: root,
       durationMs: Date.now() - startedAt,

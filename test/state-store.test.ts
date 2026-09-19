@@ -76,6 +76,7 @@ describe("durable session state", () => {
       effectClass: "test-build",
     });
     assert.equal(store.getExecutionStatus("execution-one"), "prepared");
+    assert.equal(store.getLatestTestBuildExecutionId("journal-session"), "execution-one");
     assert.deepEqual(store.listUnresolvedExecutions("journal-session"), [
       { executionId: "execution-one", status: "prepared" },
     ]);

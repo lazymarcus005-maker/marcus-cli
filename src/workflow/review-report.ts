@@ -12,6 +12,7 @@ interface TestEvidenceView {
 export function formatReviewReport(input: {
   context: GitContext;
   evidence: TestEvidenceView[];
+  latestTestExecutionId?: string;
   unresolvedExecutions: Array<{ executionId: string; status: string }>;
   runs: DurableRun[];
   tasks: DurableTask[];
@@ -23,17 +24,20 @@ export function formatReviewReport(input: {
   } else output.push("  no current Git changes detected");
 
   const latest = input.evidence.at(-1);
+  const latestPayload = typeof latest?.payload === "object" && latest.payload !== null ? latest.payload as Record<string, unknown> : {};
+  const latestTestExecutionUnrecorded = Boolean(input.latestTestExecutionId && latestPayload.executionId !== input.latestTestExecutionId);
   output.push("Tested:");
   if (latest) {
-    const payload = typeof latest.payload === "object" && latest.payload !== null ? latest.payload as Record<string, unknown> : {};
-    output.push(`  ${latest.status}; evidence=${latest.evidenceId}; snapshot=${latest.snapshotDigest}; command=${String(payload.command ?? "unknown")}; durationMs=${String(payload.durationMs ?? "unknown")}; tests=${String(payload.tests ?? "unknown")} passed=${String(payload.passed ?? "unknown")} failed=${String(payload.failed ?? "unknown")} parser=${String(payload.parserStatus ?? "unknown")} exit=${String(payload.exitCode ?? "unknown")} signal=${String(payload.signal ?? "none")} timeout=${String(payload.timedOut ?? "unknown")} cancelled=${String(payload.cancelled ?? "unknown")} outputComplete=${String(payload.outputComplete ?? "unknown")} logRef=${String(payload.logRef ?? "none")}`);
+    output.push(`  ${latestTestExecutionUnrecorded ? "unknown; latest test command has no matching evidence" : latest.status}; evidence=${latest.evidenceId}; snapshot=${latest.snapshotDigest}; command=${String(latestPayload.command ?? "unknown")}; durationMs=${String(latestPayload.durationMs ?? "unknown")}; tests=${String(latestPayload.tests ?? "unknown")} passed=${String(latestPayload.passed ?? "unknown")} failed=${String(latestPayload.failed ?? "unknown")} parser=${String(latestPayload.parserStatus ?? "unknown")} exit=${String(latestPayload.exitCode ?? "unknown")} signal=${String(latestPayload.signal ?? "none")} timeout=${String(latestPayload.timedOut ?? "unknown")} cancelled=${String(latestPayload.cancelled ?? "unknown")} outputComplete=${String(latestPayload.outputComplete ?? "unknown")} logRef=${String(latestPayload.logRef ?? "none")}`);
     if (latest.snapshotDigest !== input.context.snapshotDigest || latest.status === "stale") output.push("  WARNING: evidence is stale for the current workspace snapshot");
-  } else output.push("  no test evidence recorded");
+    if (latestTestExecutionUnrecorded) output.push("  WARNING: latest test execution has no matching persisted evidence");
+  } else if (input.latestTestExecutionId) output.push("  test command ran, but no evidence was recorded (unknown)");
+  else output.push("  no test command recorded (not_run)");
 
   output.push("Remaining Risk:");
   const risks = [
     !input.context.isRepository ? "Git snapshot unavailable; change/evidence freshness cannot be fully established" : undefined,
-    !latest ? "No test evidence; test status is unknown" : latest.status !== "passed" ? `Latest test evidence is ${latest.status}` : undefined,
+    !latest ? input.latestTestExecutionId ? "Test command ran without recorded evidence; test status is unknown" : "No test command recorded; test status is not_run" : latestTestExecutionUnrecorded ? "Latest test command has no matching evidence; test status is unknown" : latest.status !== "passed" ? `Latest test evidence is ${latest.status}` : undefined,
     latest && latest.snapshotDigest !== input.context.snapshotDigest ? "Latest test evidence does not match the current workspace snapshot" : undefined,
     input.context.changedFiles.some((file) => file.status === "untracked") ? "Untracked files are present and may not be covered by Git-based evidence" : undefined,
     input.tasks.some((task) => task.status === "in_progress") ? "One or more durable tasks remain in progress" : undefined,

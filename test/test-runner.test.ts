@@ -37,6 +37,7 @@ describe("bounded test execution and durable evidence", () => {
     assert.equal(result.evidence.tests, 2);
     const persisted = store.listTestEvidence("test-session")[0]!;
     assert.equal(persisted.evidenceId, result.evidenceId);
+    assert.equal((persisted.payload as { executionId?: string }).executionId, store.getLatestTestBuildExecutionId("test-session"));
     assert.equal(JSON.stringify(persisted.payload).includes("fake-secret"), false);
     assert.deepEqual(store.listTasks("test-session")[0]?.evidenceIds, [result.evidenceId]);
     store.transitionTask("test-session", task.id, "completed");
@@ -81,7 +82,7 @@ describe("bounded test execution and durable evidence", () => {
         maxLogBytes: 4096,
         environmentAllowlist: ["PATH"],
       };
-      const longerBuildTimeoutExecution = { ...execution, testBuildTimeoutMs: 1000 };
+      const reliableCommandExecution = { ...execution, testBuildTimeoutMs: 1000 };
       const filtered = await runTestCommand({
         root,
         sessionId: "configured-runner",
@@ -89,7 +90,7 @@ describe("bounded test execution and durable evidence", () => {
         format: "unknown",
         stateStore: store,
         authorize: async () => true,
-        execution: longerBuildTimeoutExecution,
+        execution: reliableCommandExecution,
         protectedCredentialEnvironmentNames: ["MACUS_CONFIG_TEST_SECRET"],
       });
       assert.equal(filtered.result.stdout, "missing");
@@ -101,7 +102,7 @@ describe("bounded test execution and durable evidence", () => {
         format: "unknown",
         stateStore: store,
         authorize: async () => true,
-        execution,
+        execution: reliableCommandExecution,
       });
       assert.equal(Buffer.byteLength(bounded.result.stdout, "utf8"), execution.maxOutputMemoryBytes);
       assert.equal(bounded.result.outputComplete, false);

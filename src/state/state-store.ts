@@ -228,6 +228,13 @@ export class StateStore {
     return (this.database.prepare("SELECT execution_id AS executionId FROM executions WHERE session_id = ? ORDER BY created_at").all(sessionId) as Array<{ executionId: string }>).map(({ executionId }) => executionId);
   }
 
+  getLatestTestBuildExecutionId(sessionId: string): string | undefined {
+    const row = this.database.prepare(
+      "SELECT execution_id AS executionId FROM executions WHERE session_id = ? AND effect_class = 'test-build' ORDER BY created_at DESC, rowid DESC LIMIT 1",
+    ).get(sessionId) as { executionId: string } | undefined;
+    return row?.executionId;
+  }
+
   listTasks(sessionId: string): DurableTask[] {
     const rows = this.database.prepare(
       "SELECT payload_json FROM tasks WHERE session_id = ? ORDER BY rowid",

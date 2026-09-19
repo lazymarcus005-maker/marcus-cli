@@ -437,9 +437,11 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
         }
       } else if (command === "/review") {
         const context = await readGitContext(cwd);
+        const latestTestExecutionId = stateStore.getLatestTestBuildExecutionId(kernel.sessionId!);
         stdout.write(formatReviewReport({
           context,
           evidence: stateStore.listTestEvidence(kernel.sessionId!),
+          ...(latestTestExecutionId ? { latestTestExecutionId } : {}),
           unresolvedExecutions: stateStore.listUnresolvedExecutions(kernel.sessionId!),
           runs: stateStore.listRuns(kernel.sessionId!),
           tasks: stateStore.listTasks(kernel.sessionId!),
