@@ -42,6 +42,8 @@ describe("paired benchmark harness", () => {
     assert.equal(report.rawRuns.length, 6);
     assert.equal(report.correctnessFirst.pairedComparisons, 3);
     assert.equal(report.correctnessFirst.status, "no-regression-observed");
+    assert.ok(Object.keys(report).indexOf("correctnessFirst") < Object.keys(report).indexOf("rawRuns"));
+    assert.ok(Object.keys(report).indexOf("correctnessFirst") < Object.keys(report).indexOf("metricDistributions"));
     assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.median, 1000);
     assert.equal(report.rawRuns[0]?.promptSha256, report.rawRuns[1]?.promptSha256);
     assert.equal(report.rawRuns[0]?.repositoryCache, "cold");

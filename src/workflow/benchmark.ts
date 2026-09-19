@@ -73,13 +73,13 @@ export interface BenchmarkReport {
   runtime: string;
   repetitions: number;
   conditions: BenchmarkCondition[];
-  rawRuns: BenchmarkRawRun[];
   correctnessFirst: {
     pairedComparisons: number;
     regressions: string[];
     unknownComparisons: string[];
     status: "regression" | "no-regression-observed" | "inconclusive";
   };
+  rawRuns: BenchmarkRawRun[];
   metricDistributions: Record<string, Record<string, Record<string, { count: number; median: number | null; p95: number | null }>>>;
   claims: string[];
 }
@@ -216,8 +216,8 @@ export async function runPairedBenchmark(input: BenchmarkHarnessInput): Promise<
     runtime: input.runtime ?? process.version,
     repetitions: input.repetitions,
     conditions: stableConditions,
-    rawRuns,
     correctnessFirst: { pairedComparisons: pairs.size, regressions, unknownComparisons, status: comparisonStatus },
+    rawRuns,
     metricDistributions,
     claims: ["No performance or equivalence claim is implied by this report.", "Cost is omitted unless an explicit pricing source and configuration are supplied."],
   };
