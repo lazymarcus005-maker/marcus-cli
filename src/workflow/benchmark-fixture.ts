@@ -34,6 +34,16 @@ export interface GenerateBenchmarkFixtureInput {
 }
 
 type FixtureLanguage = keyof BenchmarkFixtureManifest["languages"];
+type FixtureLanguageDefinition = {
+  extension: "ts" | "js" | "cs";
+  createBaseSource: (id: string, fileNumber: number) => string;
+};
+
+const FIXTURE_LANGUAGE_DEFINITIONS: Record<FixtureLanguage, FixtureLanguageDefinition> = {
+  typescript: { extension: "ts", createBaseSource: createExportedObjectSource },
+  javascript: { extension: "js", createBaseSource: createExportedObjectSource },
+  csharp: { extension: "cs", createBaseSource: createCSharpTypeSource },
+};
 
 /** Create a deterministic 10,000-file, 100 MiB TS/JS/C# source corpus in an empty directory. */
 export async function generateBenchmarkFixture(input: GenerateBenchmarkFixtureInput): Promise<BenchmarkFixtureManifest> {
@@ -62,10 +72,10 @@ export async function generateBenchmarkFixture(input: GenerateBenchmarkFixtureIn
     const language: FixtureLanguage = fileNumber <= languages.typescript
       ? "typescript"
       : fileNumber <= languages.typescript + languages.javascript ? "javascript" : "csharp";
-    const extension = language === "typescript" ? "ts" : language === "javascript" ? "js" : "cs";
+    const definition = FIXTURE_LANGUAGE_DEFINITIONS[language];
     const id = String(fileNumber).padStart(5, "0");
-    const path = `src/${language}/fixture-${id}.${extension}`;
-    const source = createBaseSource(language, id, fileNumber);
+    const path = `src/${language}/fixture-${id}.${definition.extension}`;
+    const source = definition.createBaseSource(id, fileNumber);
     return { language, path, id, source, baseBytes: Buffer.byteLength(source, "utf8") };
   });
   const baseBytes = plans.reduce((total, plan) => total + plan.baseBytes, 0);
@@ -117,9 +127,12 @@ async function assertEmptyDirectory(root: string): Promise<void> {
   if ((await readdir(root)).length > 0) throw new Error("Benchmark fixture root must be empty; existing files were preserved");
 }
 
-function createBaseSource(language: FixtureLanguage, id: string, fileNumber: number): string {
-  if (language === "csharp") return `namespace MacusBenchmark.Generated;\npublic static class FixtureItem${id} { public const int Id = ${fileNumber}; }\n`;
+function createExportedObjectSource(id: string, fileNumber: number): string {
   return `export const fixtureItem${id} = { id: ${fileNumber}, value: "fixture-${id}" };\n`;
+}
+
+function createCSharpTypeSource(id: string, fileNumber: number): string {
+  return `namespace MacusBenchmark.Generated;\npublic static class FixtureItem${id} { public const int Id = ${fileNumber}; }\n`;
 }
 
 function createPadding(id: string, bytes: number): string {
