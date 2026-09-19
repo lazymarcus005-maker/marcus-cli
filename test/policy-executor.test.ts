@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { PolicyExecutor } from "../src/execution/policy-executor.js";
 import { ExecutionLogStore } from "../src/execution/execution-log-store.js";
 import { openStateStore } from "../src/state/state-store.js";
@@ -344,6 +344,55 @@ describe("policy-controlled command execution", () => {
       assert.equal(store.getExecutionStatus("persist-result"), "unknown");
       assert.deepEqual(store.listUnresolvedExecutions("result-persist-failure"), [
         { executionId: "persist-result", status: "unknown" },
+      ]);
+    } finally {
+      store.close();
+    }
+  });
+
+  it("marks a side effect unknown after the agent process crashes before completion persistence", async () => {
+    const cwd = await fixtureDirectory();
+    const databasePath = join(cwd, "state.db");
+    const sideEffectPath = join(cwd, "side-effect");
+    const stateStoreUrl = new URL("../src/state/state-store.ts", import.meta.url).href;
+    const executorUrl = new URL("../src/execution/policy-executor.ts", import.meta.url).href;
+    const script = `
+      import { openStateStore } from ${JSON.stringify(stateStoreUrl)};
+      import { PolicyExecutor } from ${JSON.stringify(executorUrl)};
+      const store = openStateStore(${JSON.stringify(databasePath)});
+      store.createSession({ sessionId: "process-crash", worktreeRoot: ${JSON.stringify(cwd)}, gitDirectory: null });
+      const journal = {
+        prepareExecution: (input) => store.prepareExecution(input),
+        recordExecutionEvent: (id, status, payload) => {
+          if (status === "completed") process.exit(73);
+          store.recordExecutionEvent(id, status, payload);
+        },
+      };
+      const command = ${JSON.stringify(`${JSON.stringify(process.execPath)} -e 'require("node:fs").writeFileSync(${JSON.stringify(sideEffectPath)}, "completed")'`)};
+      await new PolicyExecutor({ authorize: async () => true, journal }).execute({
+        command, cwd: ${JSON.stringify(cwd)}, timeoutMs: 5000, allowedEnvironment: ["PATH"],
+        identity: { executionId: "crash-after-write", sessionId: "process-crash", effectClass: "workspace-write" },
+      });
+      process.exit(74);
+    `;
+    const crashed = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(crashed.error, undefined, crashed.error?.message);
+    assert.equal(crashed.status, 73, crashed.stderr);
+    assert.equal(await readFile(sideEffectPath, "utf8"), "completed");
+
+    const store = openStateStore(databasePath);
+    try {
+      assert.equal(store.getExecutionStatus("crash-after-write"), "started");
+      assert.equal(store.markInterruptedExecutionsUnknown("process-crash"), 1);
+      assert.equal(store.getExecutionStatus("crash-after-write"), "unknown");
+      assert.equal(store.markInterruptedExecutionsUnknown("process-crash"), 0);
+      assert.deepEqual(store.listUnresolvedExecutions("process-crash"), [
+        { executionId: "crash-after-write", status: "unknown" },
       ]);
     } finally {
       store.close();

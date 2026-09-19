@@ -666,6 +666,32 @@ export class StateStore {
     return row?.sessionId;
   }
 
+  /** Convert pre-crash execution states to unknown before exposing a resumed session. */
+  markInterruptedExecutionsUnknown(sessionId: string): number {
+    const now = new Date().toISOString();
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const executions = this.database.prepare(
+        "SELECT execution_id AS executionId FROM executions WHERE session_id = ? AND status IN ('prepared', 'started') ORDER BY created_at",
+      ).all(sessionId) as Array<{ executionId: string }>;
+      const insertEvent = this.database.prepare(
+        "INSERT INTO execution_events(execution_id, event_id, status, payload_json, created_at) VALUES (?, ?, 'unknown', ?, ?)",
+      );
+      const updateExecution = this.database.prepare(
+        "UPDATE executions SET status = 'unknown', updated_at = ? WHERE execution_id = ? AND status IN ('prepared', 'started')",
+      );
+      for (const { executionId } of executions) {
+        insertEvent.run(executionId, randomUUID(), JSON.stringify({ reason: "agent process restarted before execution outcome was recorded" }), now);
+        updateExecution.run(now, executionId);
+      }
+      this.database.exec("COMMIT");
+      return executions.length;
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   listUnresolvedExecutions(sessionId: string): Array<{ executionId: string; status: string }> {
     const rows = this.database.prepare(
       `SELECT execution_id AS executionId, status FROM executions
