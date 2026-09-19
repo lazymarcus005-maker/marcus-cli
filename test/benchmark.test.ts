@@ -93,6 +93,21 @@ describe("paired benchmark harness", () => {
     assert.equal(report.metricDistributions.unmodified_pi?.["large-output"]?.[conditionKey]?.wallTimeMs?.median, 910);
   });
 
+  it("preserves special task IDs as own properties in serialized reports", async () => {
+    const specialScenario: BenchmarkScenario = { ...scenario, taskId: "__proto__" };
+    const report = await runPairedBenchmark({
+      scenarios: [specialScenario],
+      conditions: [condition],
+      repetitions: 3,
+      prepareWorkspace: async () => undefined,
+      run: async () => observation(),
+    });
+
+    const serialized = JSON.parse(JSON.stringify(report)) as typeof report;
+    assert.ok(Object.hasOwn(serialized.metricDistributions.macus, "__proto__"));
+    assert.equal(serialized.metricDistributions.macus["__proto__"]?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.median, 1000);
+  });
+
   it("surfaces correctness/recovery regressions before performance and marks unknown comparisons inconclusive", async () => {
     let currentPairRun = 0;
     const report = await runPairedBenchmark({

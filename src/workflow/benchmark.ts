@@ -72,6 +72,10 @@ export interface BenchmarkMetricDistribution {
   p95: number | null;
 }
 
+export type BenchmarkMetricDistributionsByMetric = Record<string, BenchmarkMetricDistribution>;
+export type BenchmarkMetricDistributionsByCondition = Record<string, BenchmarkMetricDistributionsByMetric>;
+export type BenchmarkMetricDistributionsByTask = Record<string, BenchmarkMetricDistributionsByCondition>;
+
 export interface BenchmarkReport {
   schemaVersion: 1;
   benchmarkId: string;
@@ -86,7 +90,7 @@ export interface BenchmarkReport {
     status: "regression" | "no-regression-observed" | "inconclusive";
   };
   rawRuns: BenchmarkRawRun[];
-  metricDistributions: Record<BenchmarkSystem, Record<string, Record<string, Record<string, BenchmarkMetricDistribution>>>>;
+  metricDistributions: Record<BenchmarkSystem, BenchmarkMetricDistributionsByTask>;
   claims: string[];
 }
 
@@ -202,7 +206,7 @@ export async function runPairedBenchmark(input: BenchmarkHarnessInput): Promise<
   const metricNames = ["inputTokens", "outputTokens", "cachedInputTokens", "uncachedInputTokens", "wallTimeMs", "firstUsefulEditMs", "toolCalls", "peakContextTokens", "cliPeakRssBytes"] as const;
   const metricDistributions: BenchmarkReport["metricDistributions"] = { unmodified_pi: {}, macus: {} };
   for (const system of ["unmodified_pi", "macus"] as const) {
-    metricDistributions[system] = {};
+    metricDistributions[system] = Object.create(null) as BenchmarkMetricDistributionsByTask;
     for (const scenario of stableScenarios) {
       metricDistributions[system]![scenario.taskId] = {};
       for (const condition of stableConditions) {
