@@ -11,7 +11,7 @@ Status: **not passed; release audit remains incomplete**
 - Packaged CLI: `npm pack --dry-run`, then installed the tarball into a clean prefix using Node.js 24.21.0. The installed `macus --help` and `macus --version` commands passed; version `0.1.0`.
 - Dependency audit: `npm audit --omit=dev` reported zero vulnerabilities.
 - Linux arm64 validation: a pinned Node 24.21.0 Debian Bookworm container completed clean install (with `CXXFLAGS=-std=c++20` for Tree-sitter 0.21), all tests, typecheck, build, tarball installation, packaged CLI help/version smoke checks, and production dependency audit. The image included `ripgrep`, a runtime prerequisite.
-- Recovery regressions include cancellation during asynchronous log allocation before spawn, unknown outcome after a side effect when result persistence fails, recent-session continuation after restart, interrupted compaction, schema-migration rollback, and duplicate Pi tool-call replay refusal. Details remain in [phase-1-evidence.md](phase-1-evidence.md) and [phase-5-evidence.md](phase-5-evidence.md).
+- Recovery regressions include cancellation during asynchronous log allocation before spawn, an unknown side-effect outcome that survives state-database reopen after result persistence fails, recent-session continuation after restart, interrupted compaction, schema-migration rollback, and duplicate Pi tool-call replay refusal. Details remain in [phase-1-evidence.md](phase-1-evidence.md) and [phase-5-evidence.md](phase-5-evidence.md).
 
 ## Remaining release blockers
 

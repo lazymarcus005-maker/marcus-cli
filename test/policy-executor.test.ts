@@ -316,7 +316,8 @@ describe("policy-controlled command execution", () => {
 
   it("preserves an unknown recovery gate when a side effect succeeds but result persistence fails", async () => {
     const cwd = await fixtureDirectory();
-    const store = openStateStore(join(cwd, ".macus", "state", "state.db"));
+    const databasePath = join(cwd, ".macus", "state", "state.db");
+    let store = openStateStore(databasePath);
     store.createSession({ sessionId: "result-persist-failure", worktreeRoot: cwd, gitDirectory: null });
     const journal = {
       prepareExecution: (input: Parameters<typeof store.prepareExecution>[0]) => store.prepareExecution(input),
@@ -335,6 +336,12 @@ describe("policy-controlled command execution", () => {
         identity: { executionId: "persist-result", sessionId: "result-persist-failure", effectClass: "workspace-write" },
       }), /result persistence failed/);
       assert.equal(await readFile(join(cwd, "side-effect"), "utf8"), "done");
+      assert.deepEqual(store.listUnresolvedExecutions("result-persist-failure"), [
+        { executionId: "persist-result", status: "unknown" },
+      ]);
+      store.close();
+      store = openStateStore(databasePath);
+      assert.equal(store.getExecutionStatus("persist-result"), "unknown");
       assert.deepEqual(store.listUnresolvedExecutions("result-persist-failure"), [
         { executionId: "persist-result", status: "unknown" },
       ]);
