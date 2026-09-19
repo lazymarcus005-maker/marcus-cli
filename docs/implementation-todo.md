@@ -7,7 +7,7 @@ Implement the approved GitHub tickets in dependency order. Ticket numbers refer 
 - [x] #3 Session identity, durable state, and single-writer locking
 - [x] #4 Policy-controlled tools and bounded command lifecycle
 - [x] #5 Request budgets, instruction resolution, and manual compaction
-- [ ] #6 Phase 1 safety gate and Pi baseline harness
+- [x] #6 Phase 1 safety gate and Pi baseline harness
 - [x] #7 Deterministic search and bounded smart reads
 - [x] #8 Syntax fixtures and disambiguated symbol index
 - [x] #9 Freshness-safe edits and incremental cache invalidation
@@ -20,6 +20,6 @@ Implement the approved GitHub tickets in dependency order. Ticket numbers refer 
 - [x] #16 Durable ledger and state checkpoints
 - [x] #17 Safe full compaction and stage-aware optimization
 - [x] #18 Lightweight relationship graph and impact fallback
-- [ ] #19 Recovery and schema-migration hardening
-- [ ] #20 Paired benchmark and quality-regression report
+- [x] #19 Recovery and schema-migration hardening
+- [x] #20 Paired benchmark and quality-regression report
 - [ ] #21 Clean installation and final release audit

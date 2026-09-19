@@ -1,6 +1,11 @@
 # Pi Compatibility Record
 
-Status: **incomplete — Phase 1 gate not passed**
+Status: **local gate coverage complete — live-endpoint compatibility evidence remains open**
+
+All capabilities below are demonstrated against the pinned SDK with in-process
+loopback-provider tests and real subprocess crash tests. Loopback tests cannot
+prove endpoint-specific streaming, tool-call, or error behavior, so the Phase 1
+gate still awaits an authorized configured endpoint.
 
 ## Pinned implementation under test
 
@@ -19,10 +24,10 @@ Status: **incomplete — Phase 1 gate not passed**
 | Stream events | `session.subscribe` and `message_update` / `text_delta` are used by the adapter. | Local OpenAI-compatible SSE exchange passes |
 | Prompt and cancel | `session.prompt` and `session.abort` are wrapped by the adapter. | Loopback streaming request is observed closed after cancellation |
 | Dispose and replacement | `session.dispose` is called on CLI exit and by the adapter lifecycle. | Local provider test disposes a live session, verifies its handle is cleared, then creates and successfully prompts a distinct replacement session |
-| Centralized tool execution | Built-in Pi tools are disabled; registered repository, shell, and log tools pass through Macus policy, session journaling, and bounded outputs. | Deterministic nested tool, approved source-write, and log-spool tests pass; authorization/failure cases remain open |
-| Prepare every provider request | Inline `before_provider_request` runs through the pinned SDK's `onPayload` route; Macus guards each payload. Pi's extension runner catches handler exceptions, so Macus catches budget errors and aborts the active session before returning. | Local fixture observed two prepared requests in a tool turn; an over-budget request produced zero HTTP requests |
-| Compaction | Macus disables Pi auto-compaction and exposes checkpoint-gated `PiAgentKernel.compact()` over Pi's public `session.compact()`. Prompt, compact, restore, start, and dispose are serialized at the adapter boundary. | Loopback provider test compacts an earlier turn; overlapping prompt/compaction is rejected. Cancellation-during-compaction and protocol-fault injection remain open |
-| Resume and replacement | Pi `SessionManager.open` resumes an explicit session; `/resume` uses the same adapter. Durable run/execution recovery blocks automatic replay, and `/clear` creates a fresh session. | Persisted-session loopback test passes; crash-point reconciliation and broader session-replacement lifecycle tests remain open |
+| Centralized tool execution | Built-in Pi tools are disabled; registered repository, shell, and log tools pass through Macus policy, session journaling, and bounded outputs. | Deterministic nested tool, approved source-write, denied source-write (file preserved, no journal entry, denial observed by the next request), and log-spool tests pass |
+| Prepare every provider request | Inline `before_provider_request` runs through the pinned SDK's `onPayload` route; Macus guards each payload. Pi's extension runner catches handler exceptions, so Macus catches budget errors and aborts the active session before returning. | Local fixture observed two prepared requests in a tool turn; an over-budget request produced zero HTTP requests; a startup capability probe fails closed with a versioned error when a required public Pi method is absent (injected-missing-capability test) |
+| Compaction | Macus disables Pi auto-compaction and exposes checkpoint-gated `PiAgentKernel.compact()` over Pi's public `session.compact()`. Prompt, compact, restore, start, and dispose are serialized at the adapter boundary. | Loopback provider test compacts an earlier turn; overlapping prompt/compaction is rejected; cancellation mid-compaction closes the stream and keeps the prior conversation usable; an auth-style provider failure rejects `compact()` without a fabricated summary and the session stays retriable; a real SIGKILL during an in-flight compaction preserves the durable checkpoint, completed runs, and full prior conversation for the resumed session |
+| Resume and replacement | Pi `SessionManager.open` resumes an explicit session; `/resume` uses the same adapter. Durable run/execution recovery blocks automatic replay, and `/clear` creates a fresh session. | Persisted-session loopback test passes; recent-session continuation after restart is verified; crash-point reconciliation covers subprocess crashes before completion, after durable completion before transcript persistence, inactive-branch results, and crashes during compaction and migration |
 | Instruction loading | Pi auto-context discovery is disabled; Macus resolves root `MACUS.md`, `AGENTS.md`, and `CLAUDE.md` then injects them through the context hook. | Loopback request contains the fixture instruction exactly once; deeper per-target scopes remain incomplete |
 
 These checks use an in-process loopback OpenAI-compatible SSE fixture, not the user's configured local/private endpoint. They establish adapter behavior for the tested Pi build only; endpoint-specific streaming/tool-call/error compatibility, full crash recovery, and benchmark evidence remain outstanding. The Phase 1 gate remains open.

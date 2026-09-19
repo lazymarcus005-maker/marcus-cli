@@ -15,7 +15,7 @@ compatibility or performance result, and it must not be read as one.
 - Report file: `docs/benchmark/loopback-paired-report.json` (raw observations and distributions)
 - Benchmark ID: `c8e641ba-fbec-4a82-9bb4-ac8fef737d30`
 - Recorded at: 2026-09-19T16:12:49.570Z (local +0700)
-- Runtime: Node.js v24.21.0 (the pinned runtime), macOS arm64 (Darwin 25.6.0)
+- Runtime: Node.js v24.21.0 (the pinned runtime), macOS arm64 (Darwin 25.6.0, Mac mini M4 Pro 48 GB — the §39 reference hardware)
 - Code snapshot: commit `362f803` (`Cover compaction and migration crash boundaries in recovery tests`)
 - Endpoint: loopback OpenAI-compatible SSE fixture on `127.0.0.1`; no external state was contacted
 - Scenario: `loopback-bash-append-edit` — append a marker comment to `app.ts` via the shell

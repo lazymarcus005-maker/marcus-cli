@@ -12,13 +12,20 @@ Status: **not passed; release audit remains incomplete**
 - Packaged CLI: `npm pack --dry-run`, then installed the tarball into a clean prefix using Node.js 24.21.0. The installed `macus --help` and `macus --version` commands passed; version `0.1.0`.
 - Dependency audit: `npm audit --omit=dev` reported zero vulnerabilities.
 - Linux arm64 validation: a pinned Node 24.21.0 Debian Bookworm container completed clean install, all 153 tests, typecheck, and build against commit `e6f3a46`. `npm ci` and `npm audit --omit=dev` reported zero vulnerabilities. The packed tarball then installed into a clean prefix with `CXXFLAGS=-std=c++20` for Tree-sitter 0.21; packaged CLI help/version smoke checks passed (`0.1.0`). npm reported unapproved dependency install scripts that it skipped; the image included `git`, compiler tools, Python, and `ripgrep` for tests/build/runtime.
-- Recovery regressions include cancellation during asynchronous log allocation before spawn, subprocess crashes before execution completion and after durable completion but before Pi transcript-result persistence, rejection of inactive-branch tool results during reconciliation, an unknown side-effect outcome that survives state-database reopen after result persistence fails, bounded redacted `/recovery` inspection, recent-session continuation after restart, interrupted compaction, schema-migration rollback, and duplicate Pi tool-call replay refusal. Details remain in [phase-1-evidence.md](phase-1-evidence.md) and [phase-5-evidence.md](phase-5-evidence.md).
+- Recovery regressions include cancellation during asynchronous log allocation before spawn, subprocess crashes before execution completion and after durable completion but before Pi transcript-result persistence, rejection of inactive-branch tool results during reconciliation, an unknown side-effect outcome that survives state-database reopen after result persistence fails, bounded redacted `/recovery` inspection, recent-session continuation after restart, interrupted compaction (cancellation, provider failure, and a real SIGKILL mid-compaction after checkpoint durability), a real process crash mid-migration with clean retry, schema-migration rollback, denied source writes, and duplicate Pi tool-call replay refusal. Details remain in [phase-1-evidence.md](phase-1-evidence.md) and [phase-5-evidence.md](phase-5-evidence.md).
+
+## Verification of the final hardening pass (2026-09-19, commit `6d3988c`)
+
+- Full suite under pinned Node.js 24.21.0: 157 passed, 0 failed (153 prior plus new recovery/authorization regression tests).
+- `npm run typecheck`, `npm run build`, `npm pack --dry-run`, and packaged `macus --help`/`--version` (`0.1.0`) passed on this workspace.
+- License inventory regenerated from the pinned lockfile: 204 production packages, unchanged identifiers, application license still deliberately unselected (`null`).
+- Paired benchmark evidence recorded under the pinned runtime on this reference-hardware Mac mini; see [benchmark-report.md](benchmark-report.md).
 
 ## Remaining release blockers
 
-- `.github/workflows/ci.yml` now defines Ubuntu 24.04 and macOS 15 arm64 jobs, including tarball install smoke checks, but no hosted workflow run is available as evidence yet.
+- `.github/workflows/ci.yml` defines Ubuntu 24.04 and macOS 15 arm64 jobs, including tarball install smoke checks. The first hosted runs failed only because the macOS runner lacked `rg`; the workflow now installs ripgrep on both runners and awaits a green hosted run as evidence.
 - No authorized live provider endpoint is configured; live compatibility is not claimed.
-- The paired harness and partial in-process Pi/Macus adapters exist, but no controlled Macus-versus-unmodified-Pi measurements or quality-regression report exist. See [benchmark-protocol.md](benchmark-protocol.md).
+- One controlled paired Macus-versus-unmodified-Pi run has been recorded on the deterministic loopback provider on the reference hardware (three order-alternated pairs; correctness and recovery oracles passed; no regression). See [benchmark-report.md](benchmark-report.md) and [benchmark-protocol.md](benchmark-protocol.md). A live-endpoint paired measurement and the 10,000-file reference-fixture run remain open.
 - Phase gates 1–6 are not all green. Several compatibility, race/fault-injection, and large-repository performance cases remain explicitly open in their evidence files.
 - Third-party license/attribution review is not complete. No project license was selected or inferred.
 
