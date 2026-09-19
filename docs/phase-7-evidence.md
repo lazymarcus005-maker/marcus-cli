@@ -7,7 +7,7 @@ Status: **not passed; release audit remains incomplete**
 - Platform: macOS 15.6 arm64 (`Darwin 25.6.0 arm64`).
 - Runtime pin: Node.js 24.21.0 (`.nvmrc`; package engine `>=24.21.0 <25`).
 - Clean dependency install: `npm ci` completed under Node.js 24.21.0; npm reported zero vulnerabilities. npm skipped several unapproved dependency install scripts; the full test suite passed after installation, including native parser fixtures.
-- Build and tests: `npm test` (144 passed, 0 failed), `npm run typecheck`, and `npm run build` passed with Node.js 24.21.0 on 2026-09-19. The Linux arm64 evidence below predates nineteen test additions made since that run; no Linux rerun was performed for these additions.
+- Build and tests: `npm test` (145 passed, 0 failed), `npm run typecheck`, and `npm run build` passed with Node.js 24.21.0 on 2026-09-19. The Linux arm64 evidence below predates twenty test additions made since that run; no Linux rerun was performed for these additions.
 - Packaged CLI: `npm pack --dry-run`, then installed the tarball into a clean prefix using Node.js 24.21.0. The installed `macus --help` and `macus --version` commands passed; version `0.1.0`.
 - Dependency audit: `npm audit --omit=dev` reported zero vulnerabilities.
 - Linux arm64 validation: a pinned Node 24.21.0 Debian Bookworm container completed clean install (with `CXXFLAGS=-std=c++20` for Tree-sitter 0.21), all tests, typecheck, build, tarball installation, packaged CLI help/version smoke checks, and production dependency audit. The image included `ripgrep`, a runtime prerequisite.

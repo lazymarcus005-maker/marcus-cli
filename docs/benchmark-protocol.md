@@ -19,6 +19,10 @@ are retained as unknown observations, never treated as passes; exception text
 is omitted from reports to avoid persisting secrets. The plan is capped at
 2,000 executions.
 
+Metric distributions are kept separate by repository-cache and provider-cache
+condition; either cache state may be explicitly `unknown`, and duplicate
+condition labels are rejected instead of silently pooling distinct runs.
+
 Both adapters apply the scenario's validated OpenAI-compatible generation
 settings at Pi's pre-provider-request hook. Supported controls are temperature,
 top-p, presence/frequency penalties, seed, stop sequences, and one output-token

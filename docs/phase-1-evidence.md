@@ -13,7 +13,7 @@ Status: **in progress; gate not passed**
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Current automated suite | `npm test` | 144 passed, 0 failed (2026-09-19); deterministic local providers only |
+| Current automated suite | `npm test` | 145 passed, 0 failed (2026-09-19); deterministic local providers only |
 | Pi protocol and recovery checks | `npx tsx --test test/pi-runtime.test.ts` | 20 passed, 0 failed; nested tool-call and tool-result IDs form a correctly ordered protocol group; streaming, cancellation, compaction, dispose/replacement, and resume checks run against the deterministic local provider |
 | Stale-edit preservation | `npx tsx --test test/safe-edit.test.ts` | 2 passed; an external edit is byte-for-byte retained when a stale replacement is rejected (2026-09-19) |
 | Typecheck/build/package | `npm run typecheck`, `npm run build`, `npm pack --dry-run`, install the tarball in a clean prefix, then run packaged `macus --help` and `--version` with Node.js 24.21.0 | Passed on macOS arm64 (2026-09-19; tarball contains runtime artifacts, not compiled tests; version `0.1.0`) |
@@ -33,6 +33,6 @@ Status: **in progress; gate not passed**
 - Run the authorized configured-endpoint checks; current execution/log unit tests cover 8 MiB in-memory / 100 MiB spool limits, bounded session-scoped log access, retention and aggregate limits.
 - Clean installation was verified on macOS arm64 and Linux arm64 (Debian Bookworm container); see [phase-7-evidence.md](phase-7-evidence.md). Hosted CI has not yet supplied an independent run.
 - Configure an authorized endpoint for live compatibility evidence; current provider testing is loopback-only.
-- The paired benchmark harness plus partial in-process Pi and Macus adapters are implemented and locally tested. Both apply validated OpenAI-compatible scenario generation settings, report observed loopback token usage, preserve unknown metrics when usage is omitted, and treat failed prompts as unknown correctness/recovery. Their in-process form does not measure isolated CLI RSS/first-useful-edit time. No live endpoint or controlled paired measurements are available; no performance claims are made. See `docs/benchmark-protocol.md`.
+- The paired benchmark harness plus partial in-process Pi and Macus adapters are implemented and locally tested. Metric distributions remain separate for each repository/provider cache condition, including explicit unknown states. Both adapters apply validated OpenAI-compatible scenario generation settings, report observed loopback token usage, preserve unknown metrics when usage is omitted, and treat failed prompts as unknown correctness/recovery. Their in-process form does not measure isolated CLI RSS/first-useful-edit time. No live endpoint or controlled paired measurements are available; no performance claims are made. See `docs/benchmark-protocol.md`.
 
 The Pi adapter disables built-in tools and registers Macus policy-controlled tools. Local provider tests prove nested tool-call turns and session disposal/replacement; logs are spooled and checkpoint files reconciled. Full interruption/crash reconciliation, baseline evidence, and actual configured endpoint compatibility remain incomplete, so this is not a Phase 1 pass.

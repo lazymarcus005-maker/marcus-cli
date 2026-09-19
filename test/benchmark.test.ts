@@ -13,13 +13,13 @@ const scenario: BenchmarkScenario = {
   outputLimitTokens: 256,
 };
 const condition: BenchmarkCondition = { repositoryCache: "cold", providerCache: "unknown" };
-const observation = (testStatus: BenchmarkObservation["testStatus"] = "passed", recoveryPassed: boolean | null = true): BenchmarkObservation => ({
+const observation = (testStatus: BenchmarkObservation["testStatus"] = "passed", recoveryPassed: boolean | null = true, wallTimeMs = 1000): BenchmarkObservation => ({
   testStatus,
   inputTokens: 100,
   outputTokens: 20,
   cachedInputTokens: null,
   uncachedInputTokens: null,
-  wallTimeMs: 1000,
+  wallTimeMs,
   firstUsefulEditMs: 250,
   toolCalls: 2,
   peakContextTokens: 400,
@@ -42,10 +42,30 @@ describe("paired benchmark harness", () => {
     assert.equal(report.rawRuns.length, 6);
     assert.equal(report.correctnessFirst.pairedComparisons, 3);
     assert.equal(report.correctnessFirst.status, "no-regression-observed");
-    assert.equal(report.metricDistributions.macus?.wallTimeMs?.median, 1000);
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.median, 1000);
     assert.equal(report.rawRuns[0]?.promptSha256, report.rawRuns[1]?.promptSha256);
     assert.equal(report.rawRuns[0]?.repositoryCache, "cold");
     assert.equal(report.rawRuns[0]?.providerCache, "unknown");
+  });
+
+  it("keeps metric distributions separate for cold, warm, and unknown repository-cache states", async () => {
+    const conditions: BenchmarkCondition[] = [
+      { repositoryCache: "cold", providerCache: "unknown" },
+      { repositoryCache: "warm", providerCache: "unknown" },
+      { repositoryCache: "unknown", providerCache: "unknown" },
+    ];
+    const report = await runPairedBenchmark({
+      scenarios: [scenario],
+      conditions,
+      repetitions: 3,
+      prepareWorkspace: async () => undefined,
+      run: async ({ condition: current }) => observation("passed", true, current.repositoryCache === "cold" ? 100 : current.repositoryCache === "warm" ? 200 : 300),
+    });
+
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.median, 100);
+    assert.equal(report.metricDistributions.unmodified_pi?.["repositoryCache=warm;providerCache=unknown"]?.wallTimeMs?.median, 200);
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=unknown;providerCache=unknown"]?.wallTimeMs?.median, 300);
+    assert.equal(report.metricDistributions.macus?.["repositoryCache=cold;providerCache=unknown"]?.wallTimeMs?.count, 3);
   });
 
   it("surfaces correctness/recovery regressions before performance and marks unknown comparisons inconclusive", async () => {
@@ -68,6 +88,7 @@ describe("paired benchmark harness", () => {
 
   it("requires at least three repetitions and never converts adapter failures into passes", async () => {
     await assert.rejects(runPairedBenchmark({ scenarios: [scenario], conditions: [condition], repetitions: 2, prepareWorkspace: async () => undefined, run: async () => observation() }), /between 3 and 100/);
+    await assert.rejects(runPairedBenchmark({ scenarios: [scenario], conditions: [condition, condition], repetitions: 3, prepareWorkspace: async () => undefined, run: async () => observation() }), /condition .* is duplicated/);
     const report = await runPairedBenchmark({
       scenarios: [scenario],
       conditions: [condition],

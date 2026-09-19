@@ -3,7 +3,7 @@ import type { TrustedModelSelection } from "../config/trusted-model.js";
 import { validateProviderGenerationSettings } from "../kernel/provider-generation-settings.js";
 
 export type BenchmarkSystem = "unmodified_pi" | "macus";
-export type BenchmarkRepositoryCache = "cold" | "warm";
+export type BenchmarkRepositoryCache = "cold" | "warm" | "unknown";
 export type BenchmarkProviderCache = "cold" | "warm" | "unknown";
 export type BenchmarkTestStatus = "passed" | "failed" | "unknown";
 
@@ -80,7 +80,7 @@ export interface BenchmarkReport {
     unknownComparisons: string[];
     status: "regression" | "no-regression-observed" | "inconclusive";
   };
-  metricDistributions: Record<string, Record<string, { count: number; median: number | null; p95: number | null }>>;
+  metricDistributions: Record<string, Record<string, Record<string, { count: number; median: number | null; p95: number | null }>>>;
   claims: string[];
 }
 
@@ -118,6 +118,15 @@ export async function runPairedBenchmark(input: BenchmarkHarnessInput): Promise<
   if (input.scenarios.length > 100 || input.conditions.length > 20 || input.scenarios.length * input.conditions.length * input.repetitions * 2 > 2000) throw new Error("Benchmark plan exceeds the 2000-run safety bound");
   const stableScenarios = input.scenarios.map((scenario) => structuredClone(scenario));
   const stableConditions = input.conditions.map((condition) => structuredClone(condition));
+  const conditionKeys = new Set<string>();
+  for (const condition of stableConditions) {
+    if (!["cold", "warm", "unknown"].includes(condition.repositoryCache) || !["cold", "warm", "unknown"].includes(condition.providerCache)) {
+      throw new Error("Benchmark cache conditions must be cold, warm, or unknown");
+    }
+    const key = benchmarkConditionKey(condition);
+    if (conditionKeys.has(key)) throw new Error(`Benchmark cache condition ${key} is duplicated`);
+    conditionKeys.add(key);
+  }
   const taskIds = new Set<string>();
   for (const scenario of stableScenarios) {
     if (!scenario.taskId.trim() || taskIds.has(scenario.taskId)) throw new Error("Benchmark task IDs must be non-empty and unique");
@@ -188,8 +197,15 @@ export async function runPairedBenchmark(input: BenchmarkHarnessInput): Promise<
   const metricDistributions: BenchmarkReport["metricDistributions"] = {};
   for (const system of ["unmodified_pi", "macus"] as const) {
     metricDistributions[system] = {};
-    for (const metric of metricNames) {
-      metricDistributions[system]![metric] = distribution(rawRuns.filter((run) => run.system === system).map((run) => run.observation[metric]).filter((value): value is number => value !== null));
+    for (const condition of stableConditions) {
+      const conditionKey = benchmarkConditionKey(condition);
+      metricDistributions[system]![conditionKey] = {};
+      for (const metric of metricNames) {
+        metricDistributions[system]![conditionKey]![metric] = distribution(rawRuns
+          .filter((run) => run.system === system && run.repositoryCache === condition.repositoryCache && run.providerCache === condition.providerCache)
+          .map((run) => run.observation[metric])
+          .filter((value): value is number => value !== null));
+      }
     }
   }
   const comparisonStatus = regressions.length ? "regression" : unknownComparisons.length ? "inconclusive" : "no-regression-observed";
@@ -205,4 +221,8 @@ export async function runPairedBenchmark(input: BenchmarkHarnessInput): Promise<
     metricDistributions,
     claims: ["No performance or equivalence claim is implied by this report.", "Cost is omitted unless an explicit pricing source and configuration are supplied."],
   };
+}
+
+function benchmarkConditionKey(condition: BenchmarkCondition): string {
+  return `repositoryCache=${condition.repositoryCache};providerCache=${condition.providerCache}`;
 }
