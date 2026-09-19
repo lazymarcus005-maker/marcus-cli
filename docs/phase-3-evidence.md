@@ -15,7 +15,7 @@ Status: **in progress; gate not passed**
 
 - Focused selector, state-store, request-budget, and loopback Pi runtime tests passed after the implementation changes; the loopback test observed a fresh injected fragment, omitted a stale one, and confirmed a write-follow-up request used the new hash/content without the prior read body.
 - Typecheck passed after those changes.
-- Current full suite passes on Node.js 24.21.0 (146 tests); typecheck and build pass on the current implementation snapshot. This is not a phase sign-off because the open gate items below remain.
+- Current full suite passes on Node.js 24.21.0 (148 tests); typecheck and build pass on the current implementation snapshot. This is not a phase sign-off because the open gate items below remain.
 - Loopback Pi integration asserts the manifest payload hash equals the serialized HTTP request body and that repository instructions appear with their source hash.
 
 ## Open gate items
