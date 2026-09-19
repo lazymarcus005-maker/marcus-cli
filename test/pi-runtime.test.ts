@@ -10,6 +10,7 @@ import type { TrustedModelSelection } from "../src/config/trusted-model.js";
 import { createRequestBudgetGuard } from "../src/context/request-budget.js";
 import { assertPiSessionCapabilities, PiAgentKernel } from "../src/kernel/pi-agent-kernel.js";
 import { openStateStore } from "../src/state/state-store.js";
+import { createDurableCheckpoint, reconcileDurableCheckpoints } from "../src/workflow/checkpoints.js";
 
 const roots: string[] = [];
 const servers: Server[] = [];
@@ -87,8 +88,7 @@ async function hangingProvider(): Promise<{ baseUrl: string; waitForRequest: () 
   return { baseUrl: `http://127.0.0.1:${address.port}/v1`, waitForRequest: () => requestSeen, waitForClose: () => connectionClosed, wasClosed: () => closed };
 }
 
-async function providerHangingOnCompaction(): Promise<{ baseUrl: string; waitForCompaction: () => Promise<void>; waitForCompactionClose: () => Promise<void>; wasCompactionClosed: () => boolean; requests: () => number; bodies: () => string[] }> {
-  let requestCount = 0;
+async function providerHangingOnCompaction(): Promise<{ baseUrl: string; waitForCompaction: () => Promise<void>; waitForCompactionClose: () => Promise<void>; wasCompactionClosed: () => boolean; requests: () => number; bodies: () => string[] }> {  let requestCount = 0;
   const bodies: string[] = [];
   let requested!: () => void;
   let markClosed!: () => void;
@@ -117,6 +117,74 @@ async function providerHangingOnCompaction(): Promise<{ baseUrl: string; waitFor
   const address = server.address();
   assert.ok(address && typeof address !== "string");
   return { baseUrl: `http://127.0.0.1:${address.port}/v1`, waitForCompaction: () => compactionSeen, waitForCompactionClose: () => compactionClosed, wasCompactionClosed: () => closed, requests: () => requestCount, bodies: () => bodies };
+}
+
+async function providerFailingCompaction(): Promise<{ baseUrl: string; requests: () => number; bodies: () => string[] }> {
+  let requestCount = 0;
+  const bodies: string[] = [];
+  const server = createServer((request, response) => {
+    requestCount++;
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk: string) => { body += chunk; });
+    request.on("end", () => {
+      bodies.push(body);
+      if (body.includes("FAILING_COMPACTION_MARKER")) {
+        // Auth-style failures are not transient, so Pi's summarizer must not retry them away.
+        response.writeHead(401, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: { message: "fixture compaction unauthorized" } }));
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      const text = body.includes("RETRY_COMPACTION_MARKER")
+        ? "Retry preserved RETRY_COMPACTION_MARKER."
+        : `Answer for request ${requestCount}.`;
+      response.end(completion(text));
+    });
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return { baseUrl: `http://127.0.0.1:${address.port}/v1`, requests: () => requestCount, bodies: () => bodies };
+}
+
+async function providerHangingOnCompactionRequest(): Promise<{ baseUrl: string; waitForCompactionRequest: () => Promise<void>; requests: () => number }> {
+  let requestCount = 0;
+  let requested!: () => void;
+  const compactionSeen = new Promise<void>((resolve) => { requested = resolve; });
+  const server = createServer((request, response) => {
+    requestCount++;
+    request.setEncoding("utf8");
+    let body = "";
+    request.on("data", (chunk: string) => { body += chunk; });
+    request.on("end", () => {
+      if (requestCount >= 4) {
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        requested();
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end(completion(`Answer for request ${requestCount}.`));
+    });
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return { baseUrl: `http://127.0.0.1:${address.port}/v1`, waitForCompactionRequest: () => compactionSeen, requests: () => requestCount };
+}
+
+async function waitForFile(path: string, timeoutMs = 15_000): Promise<string> {
+  const startedAt = performance.now();
+  for (;;) {
+    try {
+      return await readFile(path, "utf8");
+    } catch {
+      if (performance.now() - startedAt > timeoutMs) throw new Error(`Timed out waiting for ${path}`);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
 }
 
 function selection(baseUrl: string, budgets: Pick<TrustedModelSelection, "contextWindow" | "reservedOutputTokens" | "safetyMarginTokens">): TrustedModelSelection {
@@ -746,6 +814,141 @@ describe("Pi adapter with a deterministic local provider", () => {
       assert.match(provider.bodies()[3] ?? "", /Keep this completed conversation available/);
     } finally {
       await kernel.dispose();
+    }
+  });
+
+  it("keeps the session usable and retriable when a compaction request fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-pi-compact-fail-"));
+    roots.push(root);
+    const provider = await providerFailingCompaction();
+    const kernel = new PiAgentKernel(root, selection(provider.baseUrl, {
+      contextWindow: 400_000,
+      reservedOutputTokens: 1_000,
+      safetyMarginTokens: 1_000,
+    }));
+    try {
+      await kernel.start();
+      await kernel.prompt("First conversation turn.");
+      await kernel.prompt(`Second conversation turn. ${"context ".repeat(30_000)}`);
+      await assert.rejects(
+        kernel.compact("Preserve FAILING_COMPACTION_MARKER and the whole conversation."),
+        /compaction/i,
+        "a failing compaction provider must not resolve as a successful compaction",
+      );
+      // The failed compaction must release the serialized operation boundary.
+      await kernel.prompt("Prompt after the failed compaction.");
+      assert.match(provider.bodies().at(-2) ?? "", /First conversation turn/, "the prior conversation must survive a failed compaction");
+      const retried = await kernel.compact("Preserve RETRY_COMPACTION_MARKER.");
+      assert.match(retried.summary, /RETRY_COMPACTION_MARKER/);
+      assert.match(JSON.stringify(provider.bodies().at(-1)), /First conversation turn/);
+    } finally {
+      await kernel.dispose();
+    }
+  });
+
+  it("preserves the checkpoint and conversation when the process crashes during compaction", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-pi-compact-crash-"));
+    roots.push(root);
+    const databasePath = join(root, ".macus", "state", "state.db");
+    const sessionIdPath = join(root, "crashed-session-id.txt");
+    const checkpointSignalPath = join(root, "checkpoint-durable.txt");
+    const selectionPath = join(root, "crashed-selection.json");
+    const provider = await providerHangingOnCompactionRequest();
+    const selected = selection(provider.baseUrl, { contextWindow: 400_000, reservedOutputTokens: 1_000, safetyMarginTokens: 1_000 });
+    await writeFile(selectionPath, JSON.stringify(selected));
+    const kernelUrl = new URL("../src/kernel/pi-agent-kernel.ts", import.meta.url).href;
+    const storeUrl = new URL("../src/state/state-store.ts", import.meta.url).href;
+    const checkpointsUrl = new URL("../src/workflow/checkpoints.ts", import.meta.url).href;
+    const childScript = `
+      import { readFileSync, writeFileSync } from "node:fs";
+      import { PiAgentKernel } from ${JSON.stringify(kernelUrl)};
+      import { openStateStore } from ${JSON.stringify(storeUrl)};
+      import { createDurableCheckpoint } from ${JSON.stringify(checkpointsUrl)};
+      const root = ${JSON.stringify(root)};
+      const selected = JSON.parse(readFileSync(${JSON.stringify(selectionPath)}, "utf8"));
+      const store = openStateStore(${JSON.stringify(databasePath)});
+      const kernel = new PiAgentKernel(root, selected, undefined, store);
+      await kernel.start();
+      const sessionId = kernel.sessionId;
+      store.createSession({ sessionId, worktreeRoot: root, gitDirectory: null });
+      await kernel.prompt("CRASH_COMPACTION_ORIGINAL_REQUEST");
+      await kernel.prompt("Add substantial working context. " + "context ".repeat(30_000));
+      await kernel.prompt("Remember this completed conversation before compacting.");
+      await createDurableCheckpoint({
+        root,
+        sessionId,
+        stateStore: store,
+        transcriptEntryId: kernel.transcriptEntryId ?? undefined,
+        goal: "Survive a crash during compaction",
+        changedFiles: [],
+      });
+      writeFileSync(${JSON.stringify(sessionIdPath)}, sessionId);
+      writeFileSync(${JSON.stringify(checkpointSignalPath)}, "durable");
+      await kernel.compact("Preserve the conversation.");
+      process.exit(74);
+    `;
+    const child = spawn(process.execPath, ["--import", "tsx", "--input-type=module", "-e", childScript], {
+      cwd: process.cwd(),
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => { stderr += chunk; });
+    let childClosed = false;
+    const closed = new Promise<void>((resolve) => {
+      child.once("close", () => { childClosed = true; resolve(); });
+    });
+    const killChild = (): void => { if (!childClosed) child.kill("SIGKILL"); };
+    try {
+      await waitForFile(checkpointSignalPath, 30_000);
+      const compactionRequestSeen = await Promise.race([
+        provider.waitForCompactionRequest().then(() => true),
+        new Promise<false>((resolve) => setTimeout(() => resolve(false), 30_000)),
+      ]);
+      assert.equal(compactionRequestSeen, true, `the child never dispatched its compaction request. stderr: ${stderr}`);
+      child.kill("SIGKILL");
+      await closed;
+
+      const sessionId = await readFile(sessionIdPath, "utf8");
+      const store = openStateStore(databasePath);
+      try {
+        const checkpoints = store.listCheckpoints(sessionId);
+        assert.equal(checkpoints.length, 1);
+        assert.equal(checkpoints[0]!.payload.goal, "Survive a crash during compaction");
+        const sessionKey = createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
+        const checkpointFile = join(root, ".macus", "checkpoints", sessionKey, `${checkpoints[0]!.checkpointId}.json`);
+        const checkpointPayload = JSON.parse(await readFile(checkpointFile, "utf8")) as { goal: string };
+        assert.equal(checkpointPayload.goal, "Survive a crash during compaction");
+        assert.deepEqual(store.listRuns(sessionId).map((run) => run.status), ["completed", "completed", "completed"]);
+        assert.equal(store.markInterruptedRunsUnknown(sessionId).length, 0);
+        assert.deepEqual(store.listUnresolvedExecutions(sessionId), []);
+        assert.deepEqual(await reconcileDurableCheckpoints({ root, sessionId, stateStore: store }), {
+          removedTemporaryFiles: [],
+          removedOrphanFiles: [],
+          missingRegisteredFiles: [],
+          invalidFiles: [],
+        });
+
+        const resumedProvider = await localProvider([completion("Resumed after the crash.")]);
+        const resumedKernel = new PiAgentKernel(root, selection(resumedProvider.baseUrl, {
+          contextWindow: 400_000,
+          reservedOutputTokens: 1_000,
+          safetyMarginTokens: 1_000,
+        }), undefined, store);
+        try {
+          await resumedKernel.start({ sessionId });
+          assert.equal(resumedKernel.autoCompactionEnabled, false);
+          await resumedKernel.prompt("Continue after the crash.");
+          assert.match(resumedProvider.bodies()[0] ?? "", /CRASH_COMPACTION_ORIGINAL_REQUEST/, "an interrupted compaction must leave the prior conversation intact for the resumed session");
+        } finally {
+          await resumedKernel.dispose();
+        }
+      } finally {
+        store.close();
+      }
+    } finally {
+      killChild();
+      await Promise.race([closed, new Promise<void>((resolve) => setTimeout(resolve, 2_000))]);
     }
   });
 

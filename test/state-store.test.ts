@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, realpath, rm, unlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -507,6 +508,69 @@ describe("durable session state", () => {
     assert.equal(retried.getSession("rollback-session")?.sessionId, "rollback-session");
     assert.equal(retried.getSession("rollback-session")?.gitIdentityCaptured, undefined);
     retried.close();
+  });
+
+  it("leaves no partial schema and retries cleanly when the process crashes mid-migration", async () => {
+    const root = await temporaryDirectory();
+    const databasePath = join(root, "crash-migration.db");
+    const initial = openStateStore(databasePath);
+    initial.createSession({ sessionId: "crash-migration-session", worktreeRoot: root, gitDirectory: null });
+    initial.close();
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec(`
+      ALTER TABLE sessions DROP COLUMN repository_identity_captured;
+      ALTER TABLE sessions DROP COLUMN repository_head;
+      ALTER TABLE sessions DROP COLUMN repository_branch;
+      UPDATE schema_metadata SET version = 4;
+    `);
+    legacy.close();
+
+    const storeUrl = new URL("../src/state/state-store.ts", import.meta.url).href;
+    const childScript = `
+      import { DatabaseSync } from "node:sqlite";
+      const originalExec = DatabaseSync.prototype.exec;
+      DatabaseSync.prototype.exec = function (sql, ...rest) {
+        if (String(sql).includes('ADD COLUMN "repository_head"')) process.exit(73);
+        return originalExec.call(this, sql, ...rest);
+      };
+      const { openStateStore } = await import(${JSON.stringify(storeUrl)});
+      openStateStore(${JSON.stringify(databasePath)});
+      process.exit(74);
+    `;
+    const child = spawn(process.execPath, ["--import", "tsx", "--input-type=module", "-e", childScript], {
+      cwd: process.cwd(),
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => { stderr += chunk; });
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(new Error(`Migration-crash child timed out. stderr: ${stderr}`));
+      }, 15_000);
+      child.once("error", (error) => { clearTimeout(timeout); reject(error); });
+      child.once("close", (code) => { clearTimeout(timeout); resolve(code ?? -1); });
+    });
+    assert.equal(exitCode, 73, stderr);
+
+    // The uncommitted migration transaction must not have partially persisted.
+    const raw = new DatabaseSync(databasePath);
+    assert.equal((raw.prepare("SELECT version FROM schema_metadata").get() as { version: number }).version, 4);
+    const columns = (raw.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>).map((column) => column.name);
+    assert.equal(columns.includes("repository_head"), false);
+    assert.equal(columns.includes("repository_branch"), false);
+    raw.close();
+
+    const migrated = openStateStore(databasePath);
+    assert.equal(migrated.getSession("crash-migration-session")?.sessionId, "crash-migration-session");
+    migrated.recordWorkingSetEntry({ sessionId: "crash-migration-session", path: "src/after-crash.ts", sourceSha256: null, status: "DISCOVERED", tier: "COLD", startLine: 1, endLine: 1, symbolId: null, reason: "post-migration" });
+    migrated.close();
+
+    const reopened = openStateStore(databasePath);
+    assert.equal(reopened.getSession("crash-migration-session")?.sessionId, "crash-migration-session");
+    assert.equal(reopened.listWorkingSet("crash-migration-session")[0]?.path, "src/after-crash.ts");
+    reopened.close();
   });
 
   it("migrates a legacy journal layout by adding nullable run links without losing evidence", async () => {
