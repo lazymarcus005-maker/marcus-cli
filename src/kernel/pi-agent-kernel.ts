@@ -1,10 +1,8 @@
 import { join } from "node:path";
-import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import {
   DefaultResourceLoader,
   createAgentSession,
   getAgentDir,
-  ModelRuntime,
   SessionManager,
   SettingsManager,
   type ExtensionFactory,
@@ -20,6 +18,7 @@ import { createRepositoryTools } from "../execution/repository-tools.js";
 import type { StateStore } from "../state/state-store.js";
 import { readGitContext } from "../workflow/git-context.js";
 import { RunController } from "../workflow/run-controller.js";
+import { createTrustedPiModel } from "./trusted-pi-model.js";
 
 export interface KernelHooks {
   prepareProviderRequest: (payload: unknown) => unknown;
@@ -158,41 +157,7 @@ export class PiAgentKernel {
     this.sessionOperation = "start";
     try {
 
-    const modelRuntime = await ModelRuntime.create({
-      credentials: new InMemoryCredentialStore(),
-      modelsPath: null,
-      refreshOnCreate: false,
-    });
-    if (modelRuntime.getProvider(this.selection.providerId)) {
-      throw new Error(
-        `Provider ID ${this.selection.providerId} conflicts with a built-in Pi provider; choose a distinct trusted provider ID`,
-      );
-    }
-    const api = "openai-completions" as const;
-    modelRuntime.registerProvider(this.selection.providerId, {
-      name: this.selection.providerId,
-      baseUrl: this.selection.baseUrl,
-      api,
-      ...(this.selection.apiKey ? { apiKey: this.selection.apiKey } : {}),
-      models: [
-        {
-          id: this.selection.model,
-          name: this.selection.model,
-          api,
-          baseUrl: this.selection.baseUrl,
-          reasoning: false,
-          input: ["text"],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-          contextWindow: this.selection.contextWindow,
-          maxTokens: this.selection.maxOutputTokens,
-        },
-      ],
-    });
-    const model = modelRuntime.getModel(
-      this.selection.providerId,
-      this.selection.model,
-    );
-    if (!model) throw new Error("Configured model is unavailable in the Pi runtime");
+    const { modelRuntime, model } = await createTrustedPiModel(this.selection);
     const settingsManager = SettingsManager.inMemory();
     const instructions = await resolveRepositoryInstructions(this.cwd, this.cwd);
     const instructionText = instructions.map((instruction) =>

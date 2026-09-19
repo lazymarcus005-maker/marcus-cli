@@ -1,9 +1,11 @@
 # Paired Benchmark Protocol
 
-`src/workflow/benchmark.ts` provides a runner-independent harness. It does not
-launch Macus or an unmodified Pi baseline by itself. Workspace preparation,
-endpoint selection, metric collection, and the authoritative test oracle must
-be supplied by explicit adapters.
+`src/workflow/benchmark.ts` provides a runner-independent harness.
+`src/workflow/pi-baseline.ts` provides a partial in-process adapter around the
+pinned Pi SDK session, with the already-trusted model selection, explicit
+built-in tool allowlist, and caller-supplied test/recovery oracles. Workspace
+preparation, endpoint selection, and the Macus adapter still must be supplied
+by explicit adapters.
 
 Each scenario pins the task prompt, starting repository revision, test oracle,
 endpoint/model, generation settings, and context/output limits. Each condition
@@ -20,10 +22,16 @@ reported separately; missing metrics remain absent. A report explicitly makes
 no performance or equivalence claim. Cache metrics require adapter-supplied
 measurements and units/denominators before interpretation.
 
-This repository currently has harness unit tests only. No controlled paired
-Macus/unmodified-Pi runs, endpoint compatibility measurements, or benchmark
-results have been recorded. Consequently the benchmark and release gates remain
-open. Before release, implement adapters and run the same fixed task set from
+The Pi adapter has a deterministic loopback-provider test for observed token
+usage and confirms that oracle time is excluded from task wall time. This is
+adapter evidence only: no authorized live endpoint, controlled paired
+Macus/unmodified-Pi run, or benchmark result has been recorded. The adapter
+records but cannot apply scenario generation settings, and its in-process form
+does not measure isolated CLI RSS or first-useful-edit latency; those metrics
+remain unknown. Its wall-time interval covers the Pi prompt turn only; session
+setup, test/recovery oracles, and cleanup are excluded. Consequently the
+benchmark and release gates remain open.
+Before release, complete the adapters and run the same fixed task set from
 identical repository revisions, prompts, endpoint/model versions, generation
 settings, limits, and test oracles; retain raw reports and document machine,
 runtime, endpoint capability evidence, and limitations.
