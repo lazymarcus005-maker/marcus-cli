@@ -1,0 +1,946 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "80bb1a9b-46e3-4dd9-933c-ead2bc33be96",
+  "createdAt": "2026-09-19T22:17:36.601Z",
+  "runtime": "paired-live/v24.21.0/deepseek-v4-flash",
+  "repetitions": 3,
+  "conditions": [
+    {
+      "repositoryCache": "cold",
+      "providerCache": "unknown"
+    }
+  ],
+  "correctnessFirst": {
+    "pairedComparisons": 9,
+    "regressions": [],
+    "unknownComparisons": [
+      "ececdc9f-3046-4610-b5bc-af08b0b7a3dd",
+      "15764c9e-a3a7-485b-a634-a9f2e088077e",
+      "d0e3d75a-edfa-4d77-b41f-562b1d81bca3",
+      "195cda69-e302-4fa6-be8e-ebf1e856e040",
+      "73bf55a5-4413-46c0-834a-5343095fdd8e",
+      "549c85bd-2ef5-43da-b393-e6583d61e994",
+      "c3e392c6-1fb6-4aac-9aed-7e24ba63d702"
+    ],
+    "status": "inconclusive"
+  },
+  "rawRuns": [
+    {
+      "taskId": "append-edit",
+      "prompt": "Append the comment line '// benchmark-edit-marker' at the very end of app.ts using the shell. Do not change anything else.",
+      "startingRevision": "34c3bb394a119a126631e9251a954f46f7cee0a1",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "0c128550-c096-4216-b49f-1f94d82bac70",
+      "pairId": "ececdc9f-3046-4610-b5bc-af08b0b7a3dd",
+      "system": "unmodified_pi",
+      "runOrder": 0,
+      "repetition": 0,
+      "promptSha256": "dc67b175d9bcd264e08bf7bbc26aacfa63f28854fcb021791409290f8e1b048b",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 5847.558583000001,
+        "firstUsefulEditMs": null,
+        "toolCalls": 2,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Pi baseline session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "append-edit",
+      "prompt": "Append the comment line '// benchmark-edit-marker' at the very end of app.ts using the shell. Do not change anything else.",
+      "startingRevision": "34c3bb394a119a126631e9251a954f46f7cee0a1",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "e87e6402-e6db-4eb3-bbfa-510389d0c973",
+      "pairId": "ececdc9f-3046-4610-b5bc-af08b0b7a3dd",
+      "system": "macus",
+      "runOrder": 1,
+      "repetition": 0,
+      "promptSha256": "dc67b175d9bcd264e08bf7bbc26aacfa63f28854fcb021791409290f8e1b048b",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 5312,
+        "outputTokens": 183,
+        "cachedInputTokens": 3840,
+        "uncachedInputTokens": 1472,
+        "wallTimeMs": 5120.606750000001,
+        "firstUsefulEditMs": null,
+        "toolCalls": 2,
+        "peakContextTokens": 1912,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "append-edit",
+      "prompt": "Append the comment line '// benchmark-edit-marker' at the very end of app.ts using the shell. Do not change anything else.",
+      "startingRevision": "34c3bb394a119a126631e9251a954f46f7cee0a1",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "ba45d89c-8fb3-4d47-a7a7-7ae42ec4bdb7",
+      "pairId": "15764c9e-a3a7-485b-a634-a9f2e088077e",
+      "system": "macus",
+      "runOrder": 2,
+      "repetition": 1,
+      "promptSha256": "dc67b175d9bcd264e08bf7bbc26aacfa63f28854fcb021791409290f8e1b048b",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 5325,
+        "outputTokens": 192,
+        "cachedInputTokens": 3840,
+        "uncachedInputTokens": 1485,
+        "wallTimeMs": 3347.4935829999995,
+        "firstUsefulEditMs": null,
+        "toolCalls": 2,
+        "peakContextTokens": 1919,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "append-edit",
+      "prompt": "Append the comment line '// benchmark-edit-marker' at the very end of app.ts using the shell. Do not change anything else.",
+      "startingRevision": "34c3bb394a119a126631e9251a954f46f7cee0a1",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "2e9d9d93-87fe-4bc1-97e8-7d6530b20635",
+      "pairId": "15764c9e-a3a7-485b-a634-a9f2e088077e",
+      "system": "unmodified_pi",
+      "runOrder": 3,
+      "repetition": 1,
+      "promptSha256": "dc67b175d9bcd264e08bf7bbc26aacfa63f28854fcb021791409290f8e1b048b",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 17067.065749999998,
+        "firstUsefulEditMs": null,
+        "toolCalls": 0,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Pi baseline session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "append-edit",
+      "prompt": "Append the comment line '// benchmark-edit-marker' at the very end of app.ts using the shell. Do not change anything else.",
+      "startingRevision": "34c3bb394a119a126631e9251a954f46f7cee0a1",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "9cce72eb-05c0-478b-9b00-f7950757b8bb",
+      "pairId": "6e5f1611-a5fb-41a5-aac3-e9e71e254702",
+      "system": "unmodified_pi",
+      "runOrder": 4,
+      "repetition": 2,
+      "promptSha256": "dc67b175d9bcd264e08bf7bbc26aacfa63f28854fcb021791409290f8e1b048b",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 4930,
+        "outputTokens": 191,
+        "cachedInputTokens": 3584,
+        "uncachedInputTokens": 1346,
+        "wallTimeMs": 3565.2054579999967,
+        "firstUsefulEditMs": null,
+        "toolCalls": 2,
+        "peakContextTokens": 1740,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "append-edit",
+      "prompt": "Append the comment line '// benchmark-edit-marker' at the very end of app.ts using the shell. Do not change anything else.",
+      "startingRevision": "34c3bb394a119a126631e9251a954f46f7cee0a1",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "9f290353-e692-43fe-a86e-2fb49de2b15c",
+      "pairId": "6e5f1611-a5fb-41a5-aac3-e9e71e254702",
+      "system": "macus",
+      "runOrder": 5,
+      "repetition": 2,
+      "promptSha256": "dc67b175d9bcd264e08bf7bbc26aacfa63f28854fcb021791409290f8e1b048b",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 5322,
+        "outputTokens": 185,
+        "cachedInputTokens": 3840,
+        "uncachedInputTokens": 1482,
+        "wallTimeMs": 3507.8374170000025,
+        "firstUsefulEditMs": null,
+        "toolCalls": 2,
+        "peakContextTokens": 1917,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "discover-edit",
+      "prompt": "Somewhere under src/ a constant named MAX_RETRIES is defined. Find the file that defines it and add the comment '// BENCHMARK_FOUND_MAX_RETRIES' as the first line of that exact file. Do not touch any other file.",
+      "startingRevision": "1e98bea1429ece7c6caf33bde309cb679dd2043b",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "8d37bd38-b4f7-4594-918c-d77b81e3a9b3",
+      "pairId": "d0e3d75a-edfa-4d77-b41f-562b1d81bca3",
+      "system": "unmodified_pi",
+      "runOrder": 6,
+      "repetition": 0,
+      "promptSha256": "ff9d88851f8d2c467b8cd1b9d534288fd4e0f952e638565be80b4423b2376642",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 7443.125583000001,
+        "firstUsefulEditMs": null,
+        "toolCalls": 3,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Pi baseline session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "discover-edit",
+      "prompt": "Somewhere under src/ a constant named MAX_RETRIES is defined. Find the file that defines it and add the comment '// BENCHMARK_FOUND_MAX_RETRIES' as the first line of that exact file. Do not touch any other file.",
+      "startingRevision": "1e98bea1429ece7c6caf33bde309cb679dd2043b",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "a87a9baa-e256-4c6f-a8a3-394217e477ca",
+      "pairId": "d0e3d75a-edfa-4d77-b41f-562b1d81bca3",
+      "system": "macus",
+      "runOrder": 7,
+      "repetition": 0,
+      "promptSha256": "ff9d88851f8d2c467b8cd1b9d534288fd4e0f952e638565be80b4423b2376642",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 13412.993000000002,
+        "firstUsefulEditMs": null,
+        "toolCalls": 3,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Macus session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "discover-edit",
+      "prompt": "Somewhere under src/ a constant named MAX_RETRIES is defined. Find the file that defines it and add the comment '// BENCHMARK_FOUND_MAX_RETRIES' as the first line of that exact file. Do not touch any other file.",
+      "startingRevision": "1e98bea1429ece7c6caf33bde309cb679dd2043b",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "27d717cd-509e-40ea-ae2a-d6e3095f7cd2",
+      "pairId": "49164a27-e36d-42dc-b044-cb3f4dc5a58e",
+      "system": "macus",
+      "runOrder": 8,
+      "repetition": 1,
+      "promptSha256": "ff9d88851f8d2c467b8cd1b9d534288fd4e0f952e638565be80b4423b2376642",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 7920,
+        "outputTokens": 389,
+        "cachedInputTokens": 5632,
+        "uncachedInputTokens": 2288,
+        "wallTimeMs": 5528.718374999997,
+        "firstUsefulEditMs": null,
+        "toolCalls": 3,
+        "peakContextTokens": 2365,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "discover-edit",
+      "prompt": "Somewhere under src/ a constant named MAX_RETRIES is defined. Find the file that defines it and add the comment '// BENCHMARK_FOUND_MAX_RETRIES' as the first line of that exact file. Do not touch any other file.",
+      "startingRevision": "1e98bea1429ece7c6caf33bde309cb679dd2043b",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "dd8cca6c-32e4-4def-97b4-59960e87ffb5",
+      "pairId": "49164a27-e36d-42dc-b044-cb3f4dc5a58e",
+      "system": "unmodified_pi",
+      "runOrder": 9,
+      "repetition": 1,
+      "promptSha256": "ff9d88851f8d2c467b8cd1b9d534288fd4e0f952e638565be80b4423b2376642",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 8819,
+        "outputTokens": 327,
+        "cachedInputTokens": 7168,
+        "uncachedInputTokens": 1651,
+        "wallTimeMs": 5059.583624999999,
+        "firstUsefulEditMs": null,
+        "toolCalls": 4,
+        "peakContextTokens": 1970,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "discover-edit",
+      "prompt": "Somewhere under src/ a constant named MAX_RETRIES is defined. Find the file that defines it and add the comment '// BENCHMARK_FOUND_MAX_RETRIES' as the first line of that exact file. Do not touch any other file.",
+      "startingRevision": "1e98bea1429ece7c6caf33bde309cb679dd2043b",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "605c34fa-9074-472b-ab15-21cf6c071228",
+      "pairId": "195cda69-e302-4fa6-be8e-ebf1e856e040",
+      "system": "unmodified_pi",
+      "runOrder": 10,
+      "repetition": 2,
+      "promptSha256": "ff9d88851f8d2c467b8cd1b9d534288fd4e0f952e638565be80b4423b2376642",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 12299.735,
+        "firstUsefulEditMs": null,
+        "toolCalls": 3,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Pi baseline session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "discover-edit",
+      "prompt": "Somewhere under src/ a constant named MAX_RETRIES is defined. Find the file that defines it and add the comment '// BENCHMARK_FOUND_MAX_RETRIES' as the first line of that exact file. Do not touch any other file.",
+      "startingRevision": "1e98bea1429ece7c6caf33bde309cb679dd2043b",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "ca918fea-0980-435b-8fa7-c3c623a82e0f",
+      "pairId": "195cda69-e302-4fa6-be8e-ebf1e856e040",
+      "system": "macus",
+      "runOrder": 11,
+      "repetition": 2,
+      "promptSha256": "ff9d88851f8d2c467b8cd1b9d534288fd4e0f952e638565be80b4423b2376642",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 7952,
+        "outputTokens": 470,
+        "cachedInputTokens": 5632,
+        "uncachedInputTokens": 2320,
+        "wallTimeMs": 4223.139250000007,
+        "firstUsefulEditMs": null,
+        "toolCalls": 3,
+        "peakContextTokens": 2381,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "test-fix",
+      "prompt": "Run the test suite with `npm test`, find and fix the bug under src/ so the suite passes, then run the suite again to confirm. Do not modify the tests.",
+      "startingRevision": "f3557264366067b8a73dcb1b1e7c54009ec742c0",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "1983ff16-6b27-42bb-a0e0-e2d71c6dcbcc",
+      "pairId": "73bf55a5-4413-46c0-834a-5343095fdd8e",
+      "system": "unmodified_pi",
+      "runOrder": 12,
+      "repetition": 0,
+      "promptSha256": "89751492ade986bac586e00291a875337e9066680fc6d86e5696c84db31038fa",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 1282449,
+        "outputTokens": 37246,
+        "cachedInputTokens": 1259008,
+        "uncachedInputTokens": 23441,
+        "wallTimeMs": 269013.326375,
+        "firstUsefulEditMs": null,
+        "toolCalls": 61,
+        "peakContextTokens": 53212,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "test-fix",
+      "prompt": "Run the test suite with `npm test`, find and fix the bug under src/ so the suite passes, then run the suite again to confirm. Do not modify the tests.",
+      "startingRevision": "f3557264366067b8a73dcb1b1e7c54009ec742c0",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "c4551a90-dc5f-4fed-91e2-2238ac66ce08",
+      "pairId": "73bf55a5-4413-46c0-834a-5343095fdd8e",
+      "system": "macus",
+      "runOrder": 13,
+      "repetition": 0,
+      "promptSha256": "89751492ade986bac586e00291a875337e9066680fc6d86e5696c84db31038fa",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 64831.750500000024,
+        "firstUsefulEditMs": null,
+        "toolCalls": 29,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Macus session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "test-fix",
+      "prompt": "Run the test suite with `npm test`, find and fix the bug under src/ so the suite passes, then run the suite again to confirm. Do not modify the tests.",
+      "startingRevision": "f3557264366067b8a73dcb1b1e7c54009ec742c0",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "055e80f4-9d0b-419e-b2b4-9113f9e41e1c",
+      "pairId": "549c85bd-2ef5-43da-b393-e6583d61e994",
+      "system": "macus",
+      "runOrder": 14,
+      "repetition": 1,
+      "promptSha256": "89751492ade986bac586e00291a875337e9066680fc6d86e5696c84db31038fa",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 46474.93020800006,
+        "firstUsefulEditMs": null,
+        "toolCalls": 15,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Macus session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "test-fix",
+      "prompt": "Run the test suite with `npm test`, find and fix the bug under src/ so the suite passes, then run the suite again to confirm. Do not modify the tests.",
+      "startingRevision": "f3557264366067b8a73dcb1b1e7c54009ec742c0",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "0b718d70-a0d2-45d9-a220-ede2945f7ff5",
+      "pairId": "549c85bd-2ef5-43da-b393-e6583d61e994",
+      "system": "unmodified_pi",
+      "runOrder": 15,
+      "repetition": 1,
+      "promptSha256": "89751492ade986bac586e00291a875337e9066680fc6d86e5696c84db31038fa",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 202055.026708,
+        "firstUsefulEditMs": null,
+        "toolCalls": 49,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Pi baseline session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "test-fix",
+      "prompt": "Run the test suite with `npm test`, find and fix the bug under src/ so the suite passes, then run the suite again to confirm. Do not modify the tests.",
+      "startingRevision": "f3557264366067b8a73dcb1b1e7c54009ec742c0",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "96332fb2-2d7e-47a0-9adc-e157f763d6a6",
+      "pairId": "c3e392c6-1fb6-4aac-9aed-7e24ba63d702",
+      "system": "unmodified_pi",
+      "runOrder": 16,
+      "repetition": 2,
+      "promptSha256": "89751492ade986bac586e00291a875337e9066680fc6d86e5696c84db31038fa",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 86752.05845800007,
+        "firstUsefulEditMs": null,
+        "toolCalls": 22,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Pi baseline session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "test-fix",
+      "prompt": "Run the test suite with `npm test`, find and fix the bug under src/ so the suite passes, then run the suite again to confirm. Do not modify the tests.",
+      "startingRevision": "f3557264366067b8a73dcb1b1e7c54009ec742c0",
+      "testOracle": "task-specific worktree and test-suite oracle (see docs/benchmark-report.md)",
+      "endpointModel": "opencode_go/deepseek-v4-flash",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 131072,
+      "outputLimitTokens": 8192,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "36e95c5e-2f4a-48af-8093-eb81bca241e5",
+      "pairId": "c3e392c6-1fb6-4aac-9aed-7e24ba63d702",
+      "system": "macus",
+      "runOrder": 17,
+      "repetition": 2,
+      "promptSha256": "89751492ade986bac586e00291a875337e9066680fc6d86e5696c84db31038fa",
+      "observation": {
+        "testStatus": "unknown",
+        "inputTokens": null,
+        "outputTokens": null,
+        "cachedInputTokens": null,
+        "uncachedInputTokens": null,
+        "wallTimeMs": 73400.04879200005,
+        "firstUsefulEditMs": null,
+        "toolCalls": 24,
+        "peakContextTokens": null,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": null,
+        "limitation": "Macus session or prompt failed; raw error omitted. Provider did not report usable token usage; token metrics are unknown. In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    }
+  ],
+  "metricDistributions": {
+    "unmodified_pi": {
+      "append-edit": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 1,
+            "median": 4930,
+            "p95": 4930
+          },
+          "outputTokens": {
+            "count": 1,
+            "median": 191,
+            "p95": 191
+          },
+          "cachedInputTokens": {
+            "count": 1,
+            "median": 3584,
+            "p95": 3584
+          },
+          "uncachedInputTokens": {
+            "count": 1,
+            "median": 1346,
+            "p95": 1346
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 5847.558583000001,
+            "p95": 17067.065749999998
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 2,
+            "p95": 2
+          },
+          "peakContextTokens": {
+            "count": 1,
+            "median": 1740,
+            "p95": 1740
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      },
+      "discover-edit": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 1,
+            "median": 8819,
+            "p95": 8819
+          },
+          "outputTokens": {
+            "count": 1,
+            "median": 327,
+            "p95": 327
+          },
+          "cachedInputTokens": {
+            "count": 1,
+            "median": 7168,
+            "p95": 7168
+          },
+          "uncachedInputTokens": {
+            "count": 1,
+            "median": 1651,
+            "p95": 1651
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 7443.125583000001,
+            "p95": 12299.735
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 3,
+            "p95": 4
+          },
+          "peakContextTokens": {
+            "count": 1,
+            "median": 1970,
+            "p95": 1970
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      },
+      "test-fix": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 1,
+            "median": 1282449,
+            "p95": 1282449
+          },
+          "outputTokens": {
+            "count": 1,
+            "median": 37246,
+            "p95": 37246
+          },
+          "cachedInputTokens": {
+            "count": 1,
+            "median": 1259008,
+            "p95": 1259008
+          },
+          "uncachedInputTokens": {
+            "count": 1,
+            "median": 23441,
+            "p95": 23441
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 202055.026708,
+            "p95": 269013.326375
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 49,
+            "p95": 61
+          },
+          "peakContextTokens": {
+            "count": 1,
+            "median": 53212,
+            "p95": 53212
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      }
+    },
+    "macus": {
+      "append-edit": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 3,
+            "median": 5322,
+            "p95": 5325
+          },
+          "outputTokens": {
+            "count": 3,
+            "median": 185,
+            "p95": 192
+          },
+          "cachedInputTokens": {
+            "count": 3,
+            "median": 3840,
+            "p95": 3840
+          },
+          "uncachedInputTokens": {
+            "count": 3,
+            "median": 1482,
+            "p95": 1485
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 3507.8374170000025,
+            "p95": 5120.606750000001
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 2,
+            "p95": 2
+          },
+          "peakContextTokens": {
+            "count": 3,
+            "median": 1917,
+            "p95": 1919
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      },
+      "discover-edit": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 2,
+            "median": 7936,
+            "p95": 7952
+          },
+          "outputTokens": {
+            "count": 2,
+            "median": 429.5,
+            "p95": 470
+          },
+          "cachedInputTokens": {
+            "count": 2,
+            "median": 5632,
+            "p95": 5632
+          },
+          "uncachedInputTokens": {
+            "count": 2,
+            "median": 2304,
+            "p95": 2320
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 5528.718374999997,
+            "p95": 13412.993000000002
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 3,
+            "p95": 3
+          },
+          "peakContextTokens": {
+            "count": 2,
+            "median": 2373,
+            "p95": 2381
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      },
+      "test-fix": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "outputTokens": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "cachedInputTokens": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "uncachedInputTokens": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 64831.750500000024,
+            "p95": 73400.04879200005
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 24,
+            "p95": 29
+          },
+          "peakContextTokens": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      }
+    }
+  },
+  "claims": [
+    "No performance or equivalence claim is implied by this report.",
+    "Cost is omitted unless an explicit pricing source and configuration are supplied."
+  ],
+  "endpointBaseUrlHost": "opencode.ai"
+}

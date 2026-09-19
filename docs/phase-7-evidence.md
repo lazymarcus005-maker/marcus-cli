@@ -23,10 +23,13 @@ Status: **not passed; release audit remains incomplete**
 
 ## Remaining release blockers
 
+- Macus conservative byte≈token budget guard pauses long tool-heavy sessions on 128k-context models before completion (measured in the live benchmark; see [benchmark-report.md](benchmark-report.md)) — the principal #20 blocker and a product decision point (refine the estimator per spec §5.2 or accept the ceiling).
 - ~~Hosted CI evidence~~ — hosted run `35455212152` is green on both platforms (see above).
+- ~~Authorized live endpoint~~ — evidenced for the OpenCode Go gateway (see `docs/pi-compatibility.md`); other providers remain untested.
+- ~~Project license~~ — MIT selected; `docs/THIRD_PARTY_NOTICES.md` generated from the installed tree (204 packages, all permissive identifiers).
 - `.github/workflows/ci.yml` defines Ubuntu 24.04 and macOS 15 arm64 jobs, including tarball install smoke checks. The first hosted runs failed only because the macOS runner lacked `rg`; after the workflow began installing ripgrep on both runners, hosted run `35455212152` completed green on `ubuntu-24.04` and `macos-15` against commit `abb2414` (tests, typecheck, build, license inventory, packed-CLI smoke checks).
 - No authorized live provider endpoint is configured; live compatibility is not claimed.
-- One controlled paired Macus-versus-unmodified-Pi run has been recorded on the deterministic loopback provider on the reference hardware (three order-alternated pairs; correctness and recovery oracles passed; no regression). See [benchmark-report.md](benchmark-report.md) and [benchmark-protocol.md](benchmark-protocol.md). A live-endpoint paired measurement and the 10,000-file reference-fixture run remain open.
+- Two controlled paired benchmark records exist on the reference hardware: the deterministic loopback fixture run (18/18 oracles passed, no regression) and a live run against the authorized OpenCode Go gateway (`deepseek-v4-flash`, 3 task classes, 0 regressions on valid pairs, unknowns labeled). See [benchmark-report.md](benchmark-report.md). Open: remaining §39 task classes, warm-cache conditions, multi-provider coverage, and the Macus budget-guard scaling pause on long sessions (the principal #20 blocker).
 - Phase gates 1–6 are not all green. Several compatibility, race/fault-injection, and large-repository performance cases remain explicitly open in their evidence files.
 - Third-party license/attribution review is not complete. No project license was selected or inferred.
 

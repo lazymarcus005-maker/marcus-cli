@@ -1,6 +1,6 @@
-# Paired Benchmark Report — Loopback Fixture
+# Paired Benchmark Report
 
-Status: **recorded controlled paired run on the deterministic loopback provider; no live-endpoint or reference-hardware measurement exists.**
+Status: **controlled paired runs recorded on the deterministic loopback fixture AND on one authorized live endpoint (OpenCode Go, `deepseek-v4-flash`); single-gateway coverage with documented open limitations.**
 
 This report records the first controlled paired Macus-versus-unmodified-Pi
 benchmark run produced by the harness in `src/workflow/benchmark.ts`. It was
@@ -65,3 +65,55 @@ recorded observations of a synthetic fixture, not a performance comparison.
 No performance, equivalence, or improvement claim is made by this report.
 Live-endpoint paired measurement remains a release blocker tracked in
 `docs/phase-7-evidence.md`.
+
+
+---
+
+# Live Paired Run — OpenCode Go gateway (2026-09-20)
+
+## Run identity (canonical raw report)
+
+- Report file: `docs/benchmark/live-paired-report.json`
+- Benchmark ID: `80bb1a9b-46e3-4dd9-933c-ead2bc33be96`
+- Recorded at: 2026-09-19T22:17:36Z (local +0700), Mac mini M4 Pro 48 GB
+- Runtime: Node.js v24.21.0 (the pinned runtime)
+- Endpoint: `https://opencode.ai/zen/go/v1` (OpenCode Go subscription), model `deepseek-v4-flash`, temperature 0
+- Scenario limits: context 131,072 tokens; reserved output 8,192; safety margin 2,048 (prompt cap 120,832 byte-estimated tokens)
+- Tasks: `append-edit` (shell edit), `discover-edit` (locate definition + edit the correct file), `test-fix` (run failing `npm test`, fix `src/`, re-run; tests may not be modified)
+- Condition: repository cache cold (fresh committed workspace per run), provider cache unknown; 3 order-alternated pairs per task
+
+## Results (canonical run)
+
+- Correctness first: 9 pairs, **0 regressions**, 7 comparisons unknown — harness status `inconclusive`
+- Passed runs: append-edit 4/6, discover-edit 3/6, test-fix 1/6
+- Non-passed runs are all `unknown` observations, split across both systems: gateway transient failures (mid-run stream failures recorded honestly as unknown, never retried into passes) and, for `test-fix`, **Macus budget-guard pauses** (below).
+
+## Findings
+
+1. **Macus budget guard pauses long sessions; unmodified Pi does not.** During long
+   test-fix sessions the serialized request payload grew past Macus's configured
+   prompt cap (observed pause: "estimated at 233,821 tokens; the configured prompt
+   cap is 120,832"), so Macus fail-closed and the task did not complete, while the
+   unmodified Pi baseline kept dispatching and completed some runs. This is the
+   documented conservative byte≈token estimate doing its job safely, but it is a
+   real task-completion deficit on 128k-context models for long tool-heavy
+   sessions. It is the principal blocker to closing ticket #20 and is a product
+   decision point: refine the estimator (spec §5.2 permits a matching tokenizer)
+   or accept the conservative ceiling.
+2. **Unmodified Pi exhibited an uncontrolled token runaway.** One Pi-baseline
+   test-fix run consumed 1,282,449 input tokens (repeatedly re-running the suite
+   in a loop) before finishing; Macus's guard structurally prevents this class of
+   runaway. This is the product thesis showing up in measured data.
+3. **Gateway transient failures affect both systems roughly evenly** and are
+   recorded as unknowns. An earlier same-code invocation driven on Node.js
+   26.8.1 recorded 14/18 passed with 0 regressions (summary observed in-session;
+   its raw file was overwritten by the canonical pinned-runtime run).
+
+## Limitations
+
+- Single gateway, single model; no other provider is claimed.
+- Three of the spec §39 task classes are instrumented; large-output, ambiguity,
+  and compaction/crash-resume classes remain unimplemented.
+- Warm-repository and provider-cache conditions are labeled unknown, not measured.
+- Isolated CLI peak RSS and first-useful-edit time remain unmeasured (in-process adapters).
+- Raw per-run data for every invocation is preserved only for the canonical report.

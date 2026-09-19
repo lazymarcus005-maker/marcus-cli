@@ -1,11 +1,11 @@
 # Pi Compatibility Record
 
-Status: **local gate coverage complete — live-endpoint compatibility evidence remains open**
+Status: **local gate coverage complete; live-endpoint compatibility evidenced for one authorized OpenAI-compatible gateway**
 
 All capabilities below are demonstrated against the pinned SDK with in-process
-loopback-provider tests and real subprocess crash tests. Loopback tests cannot
-prove endpoint-specific streaming, tool-call, or error behavior, so the Phase 1
-gate still awaits an authorized configured endpoint.
+loopback-provider tests and real subprocess crash tests. Live-endpoint
+compatibility is now evidenced for one authorized gateway and model (see the
+section below); other providers and models remain untested.
 
 ## Pinned implementation under test
 
@@ -31,3 +31,11 @@ gate still awaits an authorized configured endpoint.
 | Instruction loading | Pi auto-context discovery is disabled; Macus resolves root `MACUS.md`, `AGENTS.md`, and `CLAUDE.md` then injects them through the context hook. | Loopback request contains the fixture instruction exactly once; deeper per-target scopes remain incomplete |
 
 These checks use an in-process loopback OpenAI-compatible SSE fixture, not the user's configured local/private endpoint. They establish adapter behavior for the tested Pi build only; endpoint-specific streaming/tool-call/error compatibility, full crash recovery, and benchmark evidence remain outstanding. The Phase 1 gate remains open.
+
+## Live endpoint evidence (2026-09-20)
+
+- Endpoint: OpenCode Go gateway (`https://opencode.ai/zen/go/v1`), model `deepseek-v4-flash`, OpenAI-compatible chat-completions with streaming.
+- Adapter change: gateway endpoints receive a per-session `x-opencode-session` routing header and a `macus/0.1.0` user agent (`gatewayHeadersFor`, commit `887a91e`); generic providers are unaffected.
+- Kernel-level probe: streamed completion returned and completed (`LIVE READY`), usage reported, durable run recorded `completed` with a request manifest.
+- Full CLI run: `npx tsx src/cli.ts "Create a file named live-check.txt containing exactly LIVE_OK_2026 …"` in a fresh Git repository under the pinned Node.js 24.21.0 toolchain — the model streamed a response, requested the policy-controlled `bash` tool, the interactive approval + credential-boundary prompts were answered, the command ran, and `live-check.txt` contained exactly `LIVE_OK_2026` (oracle pass, clean `/exit`).
+- This evidences streaming, nested tool-calls, the approval policy path, and a real workspace edit against one real endpoint. Hosted-provider variance (other gateways, models, error behaviors) is not claimed.
