@@ -1,9 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { TrustedModelSelection } from "../config/trusted-model.js";
+import { validateProviderGenerationSettings } from "../kernel/provider-generation-settings.js";
 
 export type BenchmarkSystem = "unmodified_pi" | "macus";
 export type BenchmarkRepositoryCache = "cold" | "warm";
 export type BenchmarkProviderCache = "cold" | "warm" | "unknown";
 export type BenchmarkTestStatus = "passed" | "failed" | "unknown";
+
+export function isFailedAssistantStopReason(stopReason: string): boolean {
+  return stopReason === "error" || stopReason === "aborted" || stopReason === "deferred" || stopReason === "pending";
+}
 
 export interface BenchmarkScenario {
   taskId: string;
@@ -14,6 +20,20 @@ export interface BenchmarkScenario {
   generationSettings: Record<string, unknown>;
   contextLimitTokens: number;
   outputLimitTokens: number;
+}
+
+export function validateBenchmarkScenario(
+  scenario: BenchmarkScenario,
+  selection: TrustedModelSelection,
+  system: "Pi" | "Macus",
+): Record<string, unknown> {
+  if (scenario.endpointModel !== `${selection.providerId}/${selection.model}`) {
+    throw new Error(`Benchmark scenario endpoint/model does not match the trusted ${system} model selection`);
+  }
+  if (scenario.contextLimitTokens !== selection.contextWindow || scenario.outputLimitTokens !== selection.maxOutputTokens) {
+    throw new Error(`Benchmark scenario token limits must match the trusted ${system} model selection`);
+  }
+  return validateProviderGenerationSettings(scenario.generationSettings, selection.reservedOutputTokens);
 }
 
 export interface BenchmarkCondition {

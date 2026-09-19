@@ -19,13 +19,32 @@ import type { StateStore } from "../state/state-store.js";
 import { readGitContext } from "../workflow/git-context.js";
 import { RunController } from "../workflow/run-controller.js";
 import { createTrustedPiModel } from "./trusted-pi-model.js";
+import { applyProviderGenerationSettings, validateProviderGenerationSettings } from "./provider-generation-settings.js";
 
 export interface KernelHooks {
-  prepareProviderRequest: (payload: unknown) => unknown;
+  prepareProviderRequest?: (payload: unknown) => unknown;
   prepareContext?: (messages: unknown[]) => Promise<unknown[]>;
   onProviderRequestRejected?: (error: unknown) => void;
   onContextPreparationError?: (error: unknown) => void;
+  onObservation?: (observation: KernelObservation) => void;
+  onTextDelta?: (text: string) => void;
+  providerGenerationSettings?: Record<string, unknown>;
 }
+
+export interface KernelUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+export type KernelObservation =
+  | { type: "assistant_message"; usage: KernelUsage; stopReason: string }
+  | { type: "tool_call"; toolName: string };
+
+type RequestPreparationHooks = Omit<KernelHooks, "prepareProviderRequest" | "onObservation"> & {
+  prepareProviderRequest: (payload: unknown) => unknown;
+};
 
 export interface KernelSessionOptions {
   resumeRecent?: boolean;
@@ -57,7 +76,7 @@ export function assertPiSessionCapabilities(session: AgentSession): void {
 }
 
 export function createRequestPreparationExtension(
-  hooks: KernelHooks,
+  hooks: RequestPreparationHooks,
   instructionText?: string,
 ): ExtensionFactory {
   return (pi) => {
@@ -97,6 +116,8 @@ export class PiAgentKernel {
   private activeRun: RunController | undefined;
   private runTimer: NodeJS.Timeout | undefined;
   private sessionOperation: "start" | "prompt" | "compact" | "restore" | undefined;
+  private readonly observe: KernelHooks["onObservation"];
+  private readonly onTextDelta: KernelHooks["onTextDelta"];
 
   constructor(
     private readonly cwd: string,
@@ -105,6 +126,11 @@ export class PiAgentKernel {
     private readonly stateStore?: StateStore,
     private readonly authorizeCommand: (command: string, credentialEnvironmentNames: readonly string[], signal?: AbortSignal) => Promise<ExecutionAuthorization> = async () => false,
   ) {
+    this.observe = hooks?.onObservation;
+    this.onTextDelta = hooks?.onTextDelta;
+    const providerGenerationSettings = hooks?.providerGenerationSettings === undefined
+      ? undefined
+      : validateProviderGenerationSettings(hooks.providerGenerationSettings, selection.reservedOutputTokens);
     const prepareBudgetedRequest = hooks?.prepareProviderRequest ?? createRequestBudgetGuard(
       selection,
       (manifest) => { this.lastManifest = manifest; },
@@ -119,7 +145,10 @@ export class PiAgentKernel {
       if (this.activeRun && !this.activeRun.beforeModelRequest()) {
         throw new Error(this.activeRun.stopReason ?? "Run stopped at a safe model boundary");
       }
-      return prepareBudgetedRequest(payload);
+      const configuredPayload = providerGenerationSettings
+        ? applyProviderGenerationSettings(payload, providerGenerationSettings)
+        : payload;
+      return prepareBudgetedRequest(configuredPayload);
     };
   }
 
@@ -297,11 +326,27 @@ export class PiAgentKernel {
     session.setAutoCompactionEnabled(false);
     this.session = session;
     session.subscribe((event) => {
+      if (event.type === "tool_execution_start") {
+        this.emitObservation({ type: "tool_call", toolName: event.toolName });
+      } else if (event.type === "message_end" && event.message.role === "assistant") {
+        this.emitObservation({
+          type: "assistant_message",
+          usage: {
+            input: event.message.usage.input,
+            output: event.message.usage.output,
+            cacheRead: event.message.usage.cacheRead,
+            cacheWrite: event.message.usage.cacheWrite,
+          },
+          stopReason: event.message.stopReason,
+        });
+      }
       if (
         event.type === "message_update" &&
         event.assistantMessageEvent.type === "text_delta"
       ) {
-        process.stdout.write(event.assistantMessageEvent.delta);
+        if (this.onTextDelta) {
+          try { this.onTextDelta(event.assistantMessageEvent.delta); } catch { /* Optional output hooks must not alter session behavior. */ }
+        } else process.stdout.write(event.assistantMessageEvent.delta);
       }
       const observed = event as unknown as Record<string, unknown>;
       if (observed.type === "message_end" && typeof observed.message === "object" && observed.message !== null && (observed.message as { role?: unknown }).role === "assistant") {
@@ -426,12 +471,20 @@ export class PiAgentKernel {
     }
   }
 
+  private emitObservation(observation: KernelObservation): void {
+    try {
+      this.observe?.(observation);
+    } catch {
+      // Optional measurement observers must not alter coding-session behavior.
+    }
+  }
+
   async dispose(): Promise<void> {
     if (this.sessionOperation) throw new Error(`Cannot dispose a session while ${this.sessionOperation} is in progress`);
     if (this.runTimer) clearTimeout(this.runTimer);
     this.runTimer = undefined;
     this.activeRun = undefined;
-    this.session?.dispose();
+    await this.session?.dispose();
     this.session = undefined;
   }
 }

@@ -8,8 +8,10 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import type { TrustedModelSelection } from "../config/trusted-model.js";
+import { createProviderGenerationSettingsExtension } from "../kernel/provider-generation-settings.js";
 import { createTrustedPiModel } from "../kernel/trusted-pi-model.js";
-import type { BenchmarkObservation, BenchmarkScenario, BenchmarkTestStatus } from "./benchmark.js";
+import { isFailedAssistantStopReason, type BenchmarkObservation, type BenchmarkScenario, type BenchmarkTestStatus, validateBenchmarkScenario } from "./benchmark.js";
+import { createBenchmarkMetricAccumulator } from "./benchmark-metrics.js";
 
 const piBuiltInTools = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
 
@@ -22,21 +24,10 @@ export async function runUnmodifiedPiBaseline(input: {
   testOracle: (cwd: string) => Promise<BenchmarkTestStatus>;
   recoveryOracle?: (cwd: string) => Promise<boolean | null>;
 }): Promise<BenchmarkObservation> {
-  if (input.scenario.endpointModel !== `${input.selection.providerId}/${input.selection.model}`) {
-    throw new Error("Benchmark scenario endpoint/model does not match the trusted Pi model selection");
-  }
-  if (input.scenario.contextLimitTokens !== input.selection.contextWindow || input.scenario.outputLimitTokens !== input.selection.maxOutputTokens) {
-    throw new Error("Benchmark scenario token limits must match the trusted Pi model selection");
-  }
+  const generationSettings = validateBenchmarkScenario(input.scenario, input.selection, "Pi");
   if (input.tools.some((tool) => !piBuiltInTools.has(tool))) throw new Error("Pi baseline tool selection contains an unsupported built-in tool");
 
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let cachedInputTokens = 0;
-  let peakContextTokens = 0;
-  let observedUsage = false;
-  let incompleteUsage = false;
-  let toolCalls = 0;
+  const metrics = createBenchmarkMetricAccumulator();
   let promptSucceeded = false;
   let promptFailed = false;
   let assistantResponseEnded = false;
@@ -56,6 +47,7 @@ export async function runUnmodifiedPiBaseline(input: {
       noSkills: true,
       noPromptTemplates: true,
       noThemes: true,
+      extensionFactories: [createProviderGenerationSettingsExtension(generationSettings)],
     });
     await resourceLoader.reload();
     ({ session } = await createAgentSession({
@@ -69,21 +61,11 @@ export async function runUnmodifiedPiBaseline(input: {
       tools: [...input.tools],
     }));
     session.subscribe((event) => {
-      if (event.type === "tool_execution_start") toolCalls++;
+      if (event.type === "tool_execution_start") metrics.recordToolCall();
       if (event.type !== "message_end" || event.message.role !== "assistant") return;
       assistantResponseEnded = true;
-      if (event.message.stopReason === "error" || event.message.stopReason === "aborted" || event.message.stopReason === "deferred" || event.message.stopReason === "pending") promptFailed = true;
-      const usage = event.message.usage;
-      const currentTotalInputTokens = usage.input + usage.cacheRead + usage.cacheWrite;
-      if (![currentTotalInputTokens, usage.input, usage.output, usage.cacheRead, usage.cacheWrite].every((value) => Number.isFinite(value) && value >= 0) || currentTotalInputTokens === 0) {
-        incompleteUsage = true;
-        return;
-      }
-      observedUsage = true;
-      inputTokens += currentTotalInputTokens;
-      outputTokens += usage.output;
-      cachedInputTokens += usage.cacheRead + usage.cacheWrite;
-      peakContextTokens = Math.max(peakContextTokens, currentTotalInputTokens);
+      if (isFailedAssistantStopReason(event.message.stopReason)) promptFailed = true;
+      metrics.recordAssistantUsage(event.message.usage);
     });
     promptStartedAt = performance.now();
     await session.prompt(input.scenario.prompt, { expandPromptTemplates: false });
@@ -108,22 +90,22 @@ export async function runUnmodifiedPiBaseline(input: {
     try { recoveryPassed = await input.recoveryOracle(input.cwd); } catch { recoveryPassed = null; }
   }
 
+  const metricSnapshot = metrics.snapshot();
   const limitations = [
     !promptSucceeded ? "Pi baseline session or prompt failed; raw error omitted." : undefined,
-    !observedUsage || incompleteUsage ? "Provider did not report usable token usage; token metrics are unknown." : undefined,
+    metricSnapshot.usageUnavailable ? "Provider did not report usable token usage; token metrics are unknown." : undefined,
     "In-process adapter does not measure isolated CLI RSS or first useful edit time.",
-    Object.keys(input.scenario.generationSettings).length ? "Scenario generation settings are recorded but not overridden by this baseline adapter." : undefined,
   ].filter((item): item is string => Boolean(item));
   const observation: BenchmarkObservation = {
     testStatus,
-    inputTokens: observedUsage && !incompleteUsage ? inputTokens : null,
-    outputTokens: observedUsage && !incompleteUsage ? outputTokens : null,
-    cachedInputTokens: observedUsage && !incompleteUsage ? cachedInputTokens : null,
-    uncachedInputTokens: observedUsage && !incompleteUsage ? inputTokens - cachedInputTokens : null,
+    inputTokens: metricSnapshot.inputTokens,
+    outputTokens: metricSnapshot.outputTokens,
+    cachedInputTokens: metricSnapshot.cachedInputTokens,
+    uncachedInputTokens: metricSnapshot.uncachedInputTokens,
     wallTimeMs: promptStartedAt !== null && promptFinishedAt !== null ? promptFinishedAt - promptStartedAt : null,
     firstUsefulEditMs: null,
-    toolCalls,
-    peakContextTokens: observedUsage && !incompleteUsage ? peakContextTokens : null,
+    toolCalls: metricSnapshot.toolCalls,
+    peakContextTokens: metricSnapshot.peakContextTokens,
     cliPeakRssBytes: null,
     recoveryPassed,
     limitation: limitations.join(" "),
