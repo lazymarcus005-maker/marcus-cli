@@ -96,6 +96,18 @@ interface StateSessionRow {
 export class StateStore {
   constructor(private readonly database: DatabaseSync) {}
 
+  private withinImmediateTransaction<T>(operation: () => T): T {
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const result = operation();
+      this.database.exec("COMMIT");
+      return result;
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   private appendLedgerWithinTransaction(sessionId: string, payload: unknown, createdAt: string): void {
     const row = this.database.prepare("SELECT state_revision AS revision FROM sessions WHERE session_id = ?").get(sessionId) as { revision: number } | undefined;
     if (!row) throw new Error(`Unknown session ${sessionId}`);
@@ -209,20 +221,15 @@ export class StateStore {
   }
 
   markInterruptedRunsUnknown(sessionId: string): DurableRun[] {
-    this.database.exec("BEGIN IMMEDIATE");
-    try {
+    return this.withinImmediateTransaction(() => {
       const rows = this.database.prepare("SELECT run_id AS runId, session_id AS sessionId, status, created_at AS createdAt, updated_at AS updatedAt FROM runs WHERE session_id = ? AND status = 'running' ORDER BY created_at").all(sessionId) as unknown as DurableRun[];
       for (const run of rows) {
         const now = new Date().toISOString();
         this.database.prepare("UPDATE runs SET status = 'unknown', updated_at = ? WHERE run_id = ? AND status = 'running'").run(now, run.runId);
         this.appendLedgerWithinTransaction(sessionId, { kind: "run-interrupted", runId: run.runId, previousStatus: "running" }, now);
       }
-      this.database.exec("COMMIT");
       return rows.map((run) => ({ ...run, status: "unknown" }));
-    } catch (error) {
-      this.database.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   listRuns(sessionId: string): DurableRun[] {
@@ -668,9 +675,8 @@ export class StateStore {
 
   /** Convert pre-crash execution states to unknown before exposing a resumed session. */
   markInterruptedExecutionsUnknown(sessionId: string): number {
-    const now = new Date().toISOString();
-    this.database.exec("BEGIN IMMEDIATE");
-    try {
+    return this.withinImmediateTransaction(() => {
+      const now = new Date().toISOString();
       const executions = this.database.prepare(
         "SELECT execution_id AS executionId FROM executions WHERE session_id = ? AND status IN ('prepared', 'started') ORDER BY created_at",
       ).all(sessionId) as Array<{ executionId: string }>;
@@ -684,12 +690,8 @@ export class StateStore {
         insertEvent.run(executionId, randomUUID(), JSON.stringify({ reason: "agent process restarted before execution outcome was recorded" }), now);
         updateExecution.run(now, executionId);
       }
-      this.database.exec("COMMIT");
       return executions.length;
-    } catch (error) {
-      this.database.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   listUnresolvedExecutions(sessionId: string): Array<{ executionId: string; status: string }> {
