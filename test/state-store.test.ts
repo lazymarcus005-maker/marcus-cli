@@ -66,7 +66,8 @@ describe("durable session state", () => {
 
   it("journals execution intent before launch and records observed outcomes", async () => {
     const root = await temporaryDirectory();
-    const store = openStateStore(join(root, "state.db"));
+    const databasePath = join(root, "state.db");
+    let store = openStateStore(databasePath);
     store.createSession({ sessionId: "journal-session", worktreeRoot: root, gitDirectory: null });
     store.prepareExecution({
       executionId: "execution-one",
@@ -84,6 +85,12 @@ describe("durable session state", () => {
     assert.deepEqual(store.listUnresolvedExecutions("journal-session"), [
       { executionId: "execution-one", status: "started" },
     ]);
+    store.close();
+    store = openStateStore(databasePath);
+    assert.equal(store.getExecutionStatus("execution-one"), "started");
+    assert.deepEqual(store.listUnresolvedExecutions("journal-session"), [
+      { executionId: "execution-one", status: "started" },
+    ]);
     store.recordExecutionEvent("execution-one", "unknown", { reason: "crash during execution" });
     assert.equal(store.getExecutionStatus("execution-one"), "unknown");
     assert.deepEqual(store.listUnresolvedExecutions("journal-session"), [
@@ -95,11 +102,15 @@ describe("durable session state", () => {
 
   it("refuses to replay a tool call whose execution already reached durable completion", async () => {
     const root = await temporaryDirectory();
-    const store = openStateStore(join(root, "state.db"));
+    const databasePath = join(root, "state.db");
+    let store = openStateStore(databasePath);
     store.createSession({ sessionId: "tool-replay-session", worktreeRoot: root, gitDirectory: null });
     store.prepareExecution({ executionId: "completed-exec", sessionId: "tool-replay-session", toolCallId: "pi-call-1", redactedInput: { command: "publish" }, effectClass: "external" });
     store.recordExecutionEvent("completed-exec", "started", {});
     store.recordExecutionEvent("completed-exec", "completed", { exitCode: 0 });
+    store.close();
+    store = openStateStore(databasePath);
+    assert.equal(store.getExecutionStatus("completed-exec"), "completed");
     assert.throws(
       () => store.prepareExecution({ executionId: "replayed-exec", sessionId: "tool-replay-session", toolCallId: "pi-call-1", redactedInput: { command: "publish" }, effectClass: "external" }),
       /automatic replay is refused/,
