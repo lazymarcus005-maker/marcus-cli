@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macus Code — Architecture, Core Concept, Harness Engineering</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --panel-2:#fafbfc;
+    --ink:#0f172a; --ink-2:#344054; --muted:#667085;
+    --line:#e4e7ec; --line-2:#d0d5dd; --radius:14px;
+    --blue:#1d4ed8; --violet:#6d28d9; --cyan:#0e7490; --amber:#b45309; --green:#047857; --rose:#be123c;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Thai","Helvetica Neue",system-ui,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1260px; margin:0 auto; padding:0 28px 96px}
+  code,.mono{font-family:var(--mono); font-size:.86em}
+  code{background:#eef1f5; border:1px solid var(--line); border-radius:5px; padding:1px 5px; color:#1f2a37}
+  h1,h2,h3,h4{margin:0; letter-spacing:-.01em; line-height:1.25}
+  p{margin:0}
+
+  /* ---------- header ---------- */
+  .head{padding:56px 0 30px; border-bottom:1px solid var(--line-2); margin-bottom:34px}
+  .eyebrow{
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--blue); font-weight:600; margin-bottom:14px;
+  }
+  h1{font-size:40px; font-weight:700}
+  h1 span{color:var(--muted); font-weight:600}
+  .lede{max-width:74ch; color:var(--ink-2); margin-top:14px; font-size:16px}
+  .lede th{display:block; color:var(--muted); margin-top:6px; font-size:14.5px}
+
+  .facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:12px; margin-top:28px}
+  .fact{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px}
+  .fact dt{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+  .fact dd{margin:6px 0 0; font-weight:600; font-size:14.5px}
+  .fact dd small{display:block; font-weight:400; color:var(--muted); font-size:12.5px; margin-top:2px}
+
+  /* ---------- panels ---------- */
+  section{margin-top:56px; scroll-margin-top:20px}
+  .panel-head{display:flex; align-items:baseline; gap:14px; padding-bottom:14px; border-bottom:2px solid var(--ink); margin-bottom:26px}
+  .panel-num{
+    font-family:var(--mono); font-size:12px; font-weight:700; color:#fff; background:var(--ink);
+    border-radius:6px; padding:3px 8px; flex:none;
+  }
+  .panel-head h2{font-size:24px}
+  .panel-head .sub{color:var(--muted); font-size:13.5px; margin-left:auto; text-align:right}
+  .note{color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:26px}
+
+  /* ---------- bands (architecture stack) ---------- */
+  .stack{display:flex; flex-direction:column}
+  .band{
+    display:grid; grid-template-columns:236px 1fr; gap:0;
+    border:1px solid var(--line-2); border-radius:var(--radius); background:var(--panel);
+    overflow:hidden; box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .band__label{padding:18px 18px 18px 20px; border-right:1px solid var(--line); background:var(--panel-2)}
+  .band__label h3{font-size:16px}
+  .band__label .th{color:var(--muted); font-size:12.5px; margin-top:5px; line-height:1.5}
+  .band__label .path{
+    display:inline-block; margin-top:12px; font-family:var(--mono); font-size:11px;
+    color:var(--ink-2); background:#eef1f5; border:1px solid var(--line); border-radius:5px; padding:2px 6px;
+  }
+  .band__body{padding:16px 18px}
+  .kind{
+    display:inline-block; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+    border-radius:99px; padding:2px 9px; margin-bottom:10px; font-weight:600;
+  }
+  .k-blue{background:#e8efff; color:var(--blue); border:1px solid #cddffd}
+  .k-violet{background:#f1e9fe; color:var(--violet); border:1px solid #e2d4fb}
+  .k-cyan{background:#e0f4f9; color:var(--cyan); border:1px solid #c4e8f1}
+  .k-amber{background:#fdf0dc; color:var(--amber); border:1px solid #f8e0bb}
+  .k-green{background:#e3f5ee; color:var(--green); border:1px solid #c6e9da}
+  .k-rose{background:#fdeaee; color:var(--rose); border:1px solid #f8d2db}
+  .k-ink{background:#eceff3; color:var(--ink-2); border:1px solid var(--line-2)}
+
+  .cards{display:grid; gap:10px}
+  .cards--2{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .cards--3{grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+  .cards--4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+  .card{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:12px 14px}
+  .card h4{font-size:13.5px; font-family:var(--mono); font-weight:600; color:var(--ink)}
+  .card p{font-size:12.5px; color:var(--ink-2); margin-top:5px; line-height:1.5}
+  .card p.th{color:var(--muted)}
+  .card .ref{font-family:var(--mono); font-size:10.5px; color:var(--muted); display:block; margin-top:7px}
+
+  .arrow{display:flex; align-items:center; justify-content:center; gap:10px; padding:9px 0; color:var(--muted)}
+  .arrow svg{flex:none; opacity:.65}
+  .arrow span{font-family:var(--mono); font-size:11px; letter-spacing:.04em}
+
+  .siderail{margin-left:236px}
+  @media (max-width:900px){.siderail{margin-left:0}}
+  .invariant{
+    margin-left:236px; margin-top:14px; background:#101828; color:#e6edf7; border-radius:12px;
+    padding:16px 20px; font-family:var(--mono); font-size:12.5px; line-height:1.9; overflow-x:auto;
+  }
+  .invariant b{color:#7dd3fc; font-weight:600}
+  .invariant em{color:#fbbf24; font-style:normal}
+  .invariant .cap{
+    display:block; font-family:var(--sans); font-size:12.5px; color:#98a2b3; margin-top:10px; line-height:1.6;
+  }
+  @media (max-width:900px){.invariant{margin-left:0}}
+
+  /* ---------- principles ---------- */
+  .principles{display:grid; grid-template-columns:repeat(auto-fit,minmax(238px,1fr)); gap:14px}
+  .principle{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--blue); border-radius:10px; padding:16px 18px}
+  .principle:nth-child(2){border-left-color:var(--violet)}
+  .principle:nth-child(3){border-left-color:var(--cyan)}
+  .principle:nth-child(4){border-left-color:var(--amber)}
+  .principle:nth-child(5){border-left-color:var(--green)}
+  .principle h4{font-size:14.5px}
+  .principle .sec{font-family:var(--mono); font-size:10.5px; color:var(--muted); display:block; margin-bottom:7px}
+  .principle p{font-size:12.8px; color:var(--ink-2); margin-top:7px; line-height:1.55}
+  .principle p.th{color:var(--muted)}
+
+  /* ---------- stepper (flows) ---------- */
+  .flow{background:var(--panel); border:1px solid var(--line-2); border-radius:var(--radius); padding:22px 22px 24px; margin-bottom:18px}
+  .flow__head{display:flex; align-items:baseline; gap:12px; margin-bottom:20px; flex-wrap:wrap}
+  .flow__head h3{font-size:16.5px}
+  .flow__head .tag{font-family:var(--mono); font-size:11px; color:var(--muted); margin-left:auto}
+  .flow__head .th{color:var(--muted); font-size:13px; width:100%; margin-top:-6px}
+
+  .stepper{display:grid; gap:10px}
+  .stepper--6{grid-template-columns:repeat(auto-fit,minmax(158px,1fr))}
+  .stepper--4{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .stepper--5{grid-template-columns:repeat(auto-fit,minmax(186px,1fr))}
+  .step{position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:14px 14px 13px}
+  .step .n{
+    display:flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%;
+    background:var(--ink); color:#fff; font-family:var(--mono); font-size:11.5px; font-weight:700; margin-bottom:9px;
+  }
+  .step h4{font-size:13px}
+  .step p{font-size:12.3px; color:var(--ink-2); margin-top:5px; line-height:1.5}
+  .step p.th{color:var(--muted)}
+  @media (min-width:1000px){
+    .stepper--6::before,.stepper--5::before,.stepper--4::before{
+      content:""; position:absolute; left:0; right:0; height:1px; background:var(--line-2);
+    }
+    .stepper{position:relative; padding-top:26px}
+    .stepper--6::before{top:12px} .stepper--5::before{top:12px} .stepper--4::before{top:12px}
+    .step .n{position:absolute; top:-26px}
+  }
+
+  /* ---------- gate / rule list ---------- */
+  .rules{display:grid; grid-template-columns:repeat(auto-fit,minmax(272px,1fr)); gap:12px}
+  .rule{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:13px 15px}
+  .rule h4{font-size:13px; font-family:var(--mono)}
+  .rule p{font-size:12.5px; color:var(--ink-2); margin-top:6px; line-height:1.55}
+
+  .callout{
+    border:1px solid #f8d2db; background:#fdf3f5; border-radius:12px; padding:16px 18px; margin-top:16px;
+  }
+  .callout h4{font-size:13.5px; color:var(--rose); font-family:var(--mono)}
+  .callout ul{margin:9px 0 0; padding-left:20px}
+  .callout li{font-size:12.8px; color:var(--ink-2); line-height:1.6; margin-bottom:4px}
+
+  /* ---------- table ---------- */
+  table{width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line-2); border-radius:var(--radius); overflow:hidden}
+  caption{caption-side:top; text-align:left; color:var(--muted); font-size:13px; padding-bottom:12px}
+  th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top; font-size:13px}
+  thead th{background:var(--panel-2); font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  tbody tr:last-child td{border-bottom:0}
+  td.mod{font-family:var(--mono); font-size:12px; color:var(--ink-2)}
+  .pill{display:inline-block; font-family:var(--mono); font-size:10.5px; font-weight:600; border-radius:99px; padding:2px 9px; white-space:nowrap}
+  .p-open{background:#fdeaee; color:var(--rose); border:1px solid #f8d2db}
+  .p-partial{background:#fdf0dc; color:var(--amber); border:1px solid #f8e0bb}
+  .p-ok{background:#e3f5ee; color:var(--green); border:1px solid #c6e9da}
+
+  footer{margin-top:64px; padding-top:22px; border-top:1px solid var(--line-2); color:var(--muted); font-size:12.5px}
+  footer code{font-size:11.5px}
+  @media print{
+    body{background:#fff} .band,.card,.flow,.principle,.step,table{break-inside:avoid}
+    section{break-inside:avoid-page} .head{padding-top:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="head">
+  <div class="eyebrow">Macus Code · v1.1 spec · commit 3fe8517</div>
+  <h1>Architecture <span>· Core Concept · Harness Engineering</span></h1>
+  <p class="lede">
+    Macus Code คือ local-first CLI coding agent ที่ใช้ <b>Pi เป็น agent kernel</b> แล้วเพิ่มชั้นของตัวเองสำหรับ
+    source retrieval, การควบคุม context จริงต่อ request, durable task/workflow state, Git/test evidence และ terminal UX
+    <span class="th">เป้าหมายหลัก: ส่ง context ที่ "พอดีที่สุด" ให้งานสำเร็จ — ไม่ใช่ลด token แลกกับคุณภาพ
+    และทุกชั้นต้องกู้คืน (recover) ได้หลัง compaction / crash / resume</span>
+  </p>
+
+  <dl class="facts">
+    <div class="fact"><dt>Agent kernel</dt><dd>Pi SDK 0.85.1<small>@earendil-works/pi-coding-agent · pi-ai</small></dd></div>
+    <div class="fact"><dt>Runtime</dt><dd>Node 24.21.x<small>macOS arm64 เป็นหลัก, Linux arm64 validated</small></dd></div>
+    <div class="fact"><dt>Local deps</dt><dd>Git · ripgrep · Tree-sitter · SQLite<small>ไม่มี vector DB / graph DB / docker / cloud</small></dd></div>
+    <div class="fact"><dt>State authority</dt><dd>.macus/state/state.db<small>cache rebuild ได้โดยไม่แตะ durable state</small></dd></div>
+    <div class="fact"><dt>Verification seam</dt><dd>macus CLI<small>test ขับผ่าน command entrypoint + adapter</small></dd></div>
+    <div class="fact"><dt>Gate status</dt><dd style="color:var(--rose)">ยังไม่ผ่าน<small>phase 7: “not passed”; tracker 21 issues เปิดอยู่</small></dd></div>
+  </dl>
+</header>
+
+<!-- ================= PANEL A : CORE CONCEPT ================= -->
+<section id="concept">
+  <div class="panel-head">
+    <span class="panel-num">A</span>
+    <h2>Core Concept</h2>
+    <span class="sub">หลักการที่ไม่ต่อรอง · spec §3, §5.1–5.6</span>
+  </div>
+  <p class="note">หลักการด้านล่างนี้เป็น "ข้อสัญญา" ที่บังคับใช้กับทุกโมดูล ไม่ใช่แนวทางที่เลือกทำได้</p>
+
+  <div class="principles">
+    <article class="principle">
+      <span class="sec">spec §3.1 · §3.4</span>
+      <h4>Lightweight first, minimal Pi fork</h4>
+      <p>หลีกเลี่ยง infrastructure ที่ไม่จำเป็น — ไม่มี vector DB, Neo4j, embedding server, background indexer, docker, cloud
+      และ "หลีกเลี่ยงการแก้ Pi internals โดยไม่จำเป็น" ลำดับที่ยอมรับ: supported SDK composition → wrapper → documented core patch (เมื่อมี API gap ที่พิสูจน์แล้วเท่านั้น)</p>
+      <p class="th">เบาที่สุด และไม่ fork Pi ถ้าไม่จำเป็นจริง ๆ</p>
+    </article>
+
+    <article class="principle">
+      <span class="sec">spec §3.2 · §6.3 · §13</span>
+      <h4>Deterministic retrieval before AI retrieval</h4>
+      <p>ไล่จาก Working Set → ripgrep → Symbol Index → References → Code Graph → Git History → (optional) semantic search
+      และ "ไม่ใช้ LLM เพื่อ search/rank ถ้า deterministic method สามารถทำได้" — ไม่มีการเรียก LLM เพิ่มเพื่อจัดอันดับงานประจำ</p>
+      <p class="th">ค้นหาแบบ deterministic ก่อนเสมอ, LLM เป็นทางเลือกสุดท้าย</p>
+    </article>
+
+    <article class="principle">
+      <span class="sec">spec §3.3 · §6.5 · §46</span>
+      <h4>Context is a budget</h4>
+      <p>Context window ไม่ใช่พื้นที่ที่ต้องใช้ให้เต็ม จัดเรียงตาม relevance, token cost, task ปัจจุบัน, workflow stage, การเปลี่ยนแปลงปัจจุบัน และข้อจำกัดของโมเดล
+      เป้าหมายหลักคือ "minimum sufficient context for correct action" และคุณภาพต้องไม่ถูกแลกกับ token อย่างเงียบ ๆ</p>
+      <p class="th">งบ context ต้องถูกคำนวณ ไม่ใช่เดา และห้ามตัดทิ้งแบบเงียบ</p>
+    </article>
+
+    <article class="principle">
+      <span class="sec">handoff §5.4 · spec §33–34 · §30</span>
+      <h4>Approval-gated execution</h4>
+      <p>ทุก executable path — Pi built-in tools, custom tools, extensions — ผ่าน Policy Executor ทางเดียว
+      command ที่ไม่รู้จักหรือ effect นอกขอบเขตต้องได้รับอนุญาตชัดเจน และ noninteractive ต้อง "fail closed"
+      ไม่มี hard reset, force push หรือ destructive rollback อัตโนมัติ</p>
+      <p class="th">ทุกอย่างที่รันได้ต้องขออนุญาตก่อน และปิดประตูเมื่อไม่มีการยืนยัน</p>
+    </article>
+
+    <article class="principle">
+      <span class="sec">spec §5.5–5.6 · §20 · §38</span>
+      <h4>Durable state &amp; honest uncertainty</h4>
+      <p>state.db เป็น transactional authority ที่ journal <em>intent ก่อน launch</em> และผลที่สังเกตได้หลังจบ
+      สถานะที่พิสูจน์ไม่ได้ต้องเป็น <code>unknown</code> ไม่ใช่ success: output ที่ไม่ครบ, timeout, cancellation, ไม่มี test, parser ไม่รองรับ
+      ล้วน "ไม่ใช่ pass" — และ checkpoint กู้คืนแค่ agent state ไม่กู้ source bytes</p>
+      <p class="th">ความไม่รู้ต้องรายงานว่า unknown เสมอ ห้ามเดาว่าสำเร็จ</p>
+    </article>
+  </div>
+</section>
+
+<!-- ================= PANEL B : SYSTEM ARCHITECTURE ================= -->
+<section id="arch">
+  <div class="panel-head">
+    <span class="panel-num">B</span>
+    <h2>System Architecture</h2>
+    <span class="sub">โมดูลเดียว (single package) · ขอบเขตเป็น logical module · spec §4, §41</span>
+  </div>
+  <p class="note">
+    ทิศทางข้อมูลไหลขึ้น–ลงตาม band: user intent → harness → kernel → context/retrieval → policy → durable state.
+    โมดูลแอปพลิเคชันห้าม import Pi internal types หรือแก้ไฟล์ session ของ Pi โดยตรง — ต้องผ่าน adapter ที่ pin ไว้
+  </p>
+
+  <div class="stack">
+
+    <!-- 1 -->
+    <div class="band">
+      <div class="band__label">
+        <h3>1 · CLI / TUI</h3>
+        <p class="th">จุดเดียวที่ผู้ใช้แตะ — และเป็น verification seam เดียวของทั้งระบบ</p>
+        <span class="path">src/cli.ts</span>
+      </div>
+      <div class="band__body">
+        <span class="kind k-ink">entrypoint</span>
+        <div class="cards cards--2">
+          <article class="card">
+            <h4>macus [task]</h4>
+            <p><code>runCli()</code> → session loop ผ่าน <code>readline</code>; <code>-h/--help</code>, <code>-v/--version</code></p>
+          </article>
+          <article class="card">
+            <h4>Session commands</h4>
+            <p class="mono" style="line-height:1.7">/status /context /context files /map /search /symbol /diff /git /test /review /tasks /goal /decision /next-action /blocker /task /checkpoint /checkpoint restore /compact /recovery /models /model /settings /resume</p>
+            <span class="ref">ทุกคำสั่งผูกกับ feature flag: ปิด feature → คำสั่งนั้นถูกปฏิเสธ</span>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v15M12 19l-5-5M12 19l5-5"/></svg>
+      <span>user intent / approved operations</span>
+    </div>
+
+    <!-- 2 -->
+    <div class="band">
+      <div class="band__label">
+        <h3>2 · Agent Harness</h3>
+        <p class="th">ควบคุม "workflow ที่ durable" ไม่ได้ทำ model/tool loop ซ้ำกับ Pi</p>
+        <span class="path">src/workflow/</span>
+      </div>
+      <div class="band__body">
+        <span class="kind k-green">control plane</span>
+        <div class="cards cards--4">
+          <article class="card">
+            <h4>RunController</h4>
+            <p>เพดานของ run: 40 model turns · 3 consecutive failures ที่ fingerprint เดิมโดยไม่มี source change · 30 นาที</p>
+            <span class="ref">workflow/run-controller.ts</span>
+          </article>
+          <article class="card">
+            <h4>Tasks &amp; ledger</h4>
+            <p>pending / in_progress / completed / blocked / skipped — หนึ่ง in_progress ต่อ active run; completed ไม่ได้แปลว่า test ผ่าน</p>
+            <span class="ref">state/state-store.ts</span>
+          </article>
+          <article class="card">
+            <h4>Test evidence</h4>
+            <p>junit / trx / node-json; format ที่ไม่รู้จัก = <code>unknown</code>; เก็บ command, cwd, exit, signal, timeout, digest ของ working snapshot</p>
+            <span class="ref">workflow/test-evidence.ts</span>
+          </article>
+          <article class="card">
+            <h4>Checkpoints &amp; recovery</h4>
+            <p>atomic temp-write + fsync + rename; restore = agent state เท่านั้น "ไม่คืน source bytes"</p>
+            <span class="ref">workflow/checkpoints.ts</span>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v15M12 19l-5-5M12 19l5-5"/></svg>
+      <span>one mutating run per worktree (OS-backed lock)</span>
+    </div>
+
+    <!-- 3 -->
+    <div class="band">
+      <div class="band__label">
+        <h3>3 · Agent Kernel adapter</h3>
+        <p class="th">ห่อ Pi SDK — จุดเดียวที่แตะ Pi · Macus เป็นเจ้าของ compaction แต่เพียงผู้เดียว</p>
+        <span class="path">src/kernel/</span>
+      </div>
+      <div class="band__body">
+        <span class="kind k-blue">adapter → Pi</span>
+        <div class="cards cards--3">
+          <article class="card">
+            <h4>PiAgentKernel</h4>
+            <p>start / prompt / cancel / compact / restoreTranscriptEntry / dispose · <code>assertPiSessionCapabilities()</code> ตรวจ hook ที่ต้องมีก่อนใช้งานจริง</p>
+            <span class="ref">kernel/pi-agent-kernel.ts</span>
+          </article>
+          <article class="card">
+            <h4>Request preparation hook</h4>
+            <p>extension ที่รัน <em>ก่อนทุก provider request</em>: เรียก context runtime แล้วสร้าง request manifest ก่อน dispatch</p>
+            <span class="ref">createRequestPreparationExtension()</span>
+          </article>
+          <article class="card">
+            <h4>Trust composition</h4>
+            <p><code>noTools: "builtin"</code> — Pi built-ins ปิดหมด เหลือ tool เดียวคือ policy shell tool;
+            <code>setAutoCompactionEnabled(false)</code>; <code>noExtensions/noSkills/noContextFiles</code> เพราะ Macus คุม discovery เอง</p>
+            <span class="ref">kernel/trusted-pi-model.ts</span>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v15M12 19l-5-5M12 19l5-5"/></svg>
+      <span>effective request view + registered tools</span>
+    </div>
+
+    <!-- 4 -->
+    <div class="band">
+      <div class="band__label">
+        <h3>4 · Context Runtime + Code Intelligence</h3>
+        <p class="th">สร้าง "effective request view" และหา candidate แบบ versioned — ทั้งคู่ไม่เรียกโมเดลเอง</p>
+        <span class="path">src/context/ · src/retrieval/</span>
+      </div>
+      <div class="band__body">
+        <span class="kind k-violet">context</span>
+        <div class="cards cards--3">
+          <article class="card">
+            <h4>Instructions</h4>
+            <p>MACUS.md &gt; AGENTS.md &gt; CLAUDE.md · hash ทุกไฟล์และแนบเข้า manifest</p>
+            <span class="ref">context/instructions.ts</span>
+          </article>
+          <article class="card">
+            <h4>Working set runtime</h4>
+            <p>ACTIVE / RELATED / DISCOVERED / STALE × HOT / WARM / COLD · transcript ของ Pi แยกจาก effective view เสมอ</p>
+            <span class="ref">context/working-set-runtime.ts</span>
+          </article>
+          <article class="card">
+            <h4>Request budget guard</h4>
+            <p>เพดาน total / input / category / single-read — เกินแล้ว <em>pause</em> ไม่ใช่ตัดเงียบ</p>
+            <span class="ref">context/request-budget.ts</span>
+          </article>
+        </div>
+        <div style="height:14px"></div>
+        <span class="kind k-cyan">retrieval</span>
+        <div class="cards cards--3">
+          <article class="card">
+            <h4>search_code / smartRead</h4>
+            <p>ripgrep แบบ structured argv, bounded 100 matches / 10 s, cursor ถูก invalidate เมื่อ file-set เปลี่ยน</p>
+            <span class="ref">retrieval/search.ts</span>
+          </article>
+          <article class="card">
+            <h4>Symbol index</h4>
+            <p>Tree-sitter: TS/TSX, JS/JSX, C# · cache ที่ <code>.macus/cache/index.db</code> · corrupt → quarantine แล้ว rebuild</p>
+            <span class="ref">retrieval/symbol-index.ts</span>
+          </article>
+          <article class="card">
+            <h4>Relationship graph</h4>
+            <p>imports · contains · references · implements · test_references โดยแต่ละ edge เป็น confirmed / candidate / unresolved</p>
+            <span class="ref">retrieval/relationship-graph.ts</span>
+          </article>
+          <article class="card">
+            <h4>repo map</h4>
+            <p>ภาพรวม repo แบบ bounded (ค่าเริ่มต้น ~1200 tokens) ที่ <code>/map</code></p>
+            <span class="ref">retrieval/repo-map.ts</span>
+          </article>
+          <article class="card">
+            <h4>safe edit</h4>
+            <p>เขียนเฉพาะเมื่อ hash ตรง — ไม่ตรงคือ <code>StaleEditError</code>; hash เก่าห้าม drive การแก้ไฟล์</p>
+            <span class="ref">retrieval/safe-edit.ts</span>
+          </article>
+          <article class="card">
+            <h4>ความจริงเรื่อง symbol</h4>
+            <p>ชื่อซ้ำไม่พอจะยืนยันผู้เรียก · coverage = <code>partial</code> เมื่อความครบถ้วนไม่รู้ · "ranking score ไม่ใช่ semantic confidence"</p>
+            <span class="ref">spec §11–12</span>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v15M12 19l-5-5M12 19l5-5"/></svg>
+      <span>tool calls · git context</span>
+    </div>
+
+    <!-- 5 -->
+    <div class="band">
+      <div class="band__label">
+        <h3>5 · Policy Executor &amp; Execution</h3>
+        <p class="th">ประตูเดียวของทุกสิ่งที่รันได้ — อนุญาต, journal, จำกัด output, ยกเลิกได้</p>
+        <span class="path">src/execution/</span>
+      </div>
+      <div class="band__body">
+        <span class="kind k-amber">single gate</span>
+        <div class="cards cards--3">
+          <article class="card">
+            <h4>PolicyExecutor</h4>
+            <p>authorize → journal <code>prepared</code> ก่อน launch → spawn → เก็บผลแบบ bounded → <code>completed | failed | cancelled | unknown</code></p>
+            <span class="ref">execution/policy-executor.ts</span>
+          </article>
+          <article class="card">
+            <h4>Output bounds</h4>
+            <p>จำกัดในหน่วยความจำ 8 MiB ต่อ execution · spool ลง disk 100 MiB · log retention 7 วัน, cap 1 GiB · process-group kill พร้อม grace</p>
+            <span class="ref">execution/execution-log-store.ts</span>
+          </article>
+          <article class="card">
+            <h4>Environment allowlist</h4>
+            <p>PATH, HOME, TMPDIR, LANG, LC_ALL เท่านั้น + redaction ของ credential names</p>
+            <span class="ref">execution/execution-settings.ts</span>
+          </article>
+          <article class="card">
+            <h4>Registered tools</h4>
+            <p class="mono">search_code · read_range · search_symbol · git_inspect · write_file + policy shell tool</p>
+            <span class="ref">execution/repository-tools.ts</span>
+          </article>
+          <article class="card">
+            <h4>Git context</h4>
+            <p>diff / log / show / blame แบบ bounded + change-aware invalidation หลังแก้ไฟล์</p>
+            <span class="ref">workflow/git-inspection.ts</span>
+          </article>
+          <article class="card">
+            <h4>ขอบเขตที่ซื่อสัตย์</h4>
+            <p>"V1 local execution <b>ไม่ใช่ OS sandbox</b>" และ command-name matching เป็น diagnostic ไม่ใช่ขอบเขตความปลอดภัย</p>
+            <span class="ref">spec §34</span>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v15M12 19l-5-5M12 19l5-5"/></svg>
+      <span>durable writes (transactional)</span>
+    </div>
+
+    <!-- 6 -->
+    <div class="band">
+      <div class="band__label">
+        <h3>6 · Durable state on disk</h3>
+        <p class="th">state.db คือ authority ส่วน cache สร้างใหม่ได้โดยไม่กระทบ state</p>
+        <span class="path">.macus/</span>
+      </div>
+      <div class="band__body">
+        <span class="kind k-green">persistence</span>
+        <div class="cards cards--3">
+          <article class="card">
+            <h4>state/state.db</h4>
+            <p>SQLite + WAL + <code>synchronous=FULL</code> + foreign keys + schema version · ตาราง: sessions, runs, tasks, ledger_revisions, executions, execution_events, test_evidence, checkpoints, schema_metadata</p>
+          </article>
+          <article class="card">
+            <h4>cache/index.db</h4>
+            <p>symbol/relationship cache ที่ rebuild ได้ — "ไม่แตะ durable state" · generation-keyed invalidation</p>
+          </article>
+          <article class="card">
+            <h4>sessions/&nbsp;·&nbsp;checkpoints/&nbsp;·&nbsp;logs/&nbsp;·&nbsp;metrics/</h4>
+            <p>Pi transcript เป็นของ Pi — Macus "ไม่เขียนทับไฟล์นั้นเอง" · checkpoint atomic · log redacted ต่อ session</p>
+          </article>
+          <article class="card">
+            <h4>Single-writer lock</h4>
+            <p><code>acquireWorktreeMutationLock()</code> — หนึ่ง mutating process/run ต่อ worktree; terminal อื่นเป็น read-only</p>
+          </article>
+          <article class="card">
+            <h4>Identity binding</h4>
+            <p>ผูกกับ canonical worktree root + Git dir/common-dir · repo ที่ถูกย้ายต้อง rebind ชัดเจน</p>
+          </article>
+          <article class="card">
+            <h4>ไม่มี assumed transaction</h4>
+            <p>"ไม่มีการสมมติ transaction ที่คลุม Pi transcript กับ state.db พร้อมกัน" — ต้อง reconcile หลัง restart</p>
+          </article>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="invariant">
+    <b>budget invariant</b> &nbsp;estimated_full_request + reserved_output_tokens + safety_margin_tokens
+    &nbsp;<em>≤</em>&nbsp; validated_model_context_window
+    <span class="cap">
+      ตรวจก่อน dispatch ทุกครั้ง · พร้อมข้อสัญญาด้านความปลอดภัย: repo config เลือก trusted alias ได้
+      แต่ "แทน provider URL ขณะสืบทอด key ส่วนกลาง" ไม่ได้ และ "ข้อความใน repo ยกระดับ policy, อนุญาต endpoint, เปิดเผย secret หรือโหลด plugin ที่รันได้" ไม่ได้
+    </span>
+  </div>
+</section>
+
+<!-- ================= PANEL C : FLOWS ================= -->
+<section id="flows">
+  <div class="panel-head">
+    <span class="panel-num">C</span>
+    <h2>Three Flows That Define The System</h2>
+    <span class="sub">ทุก request · ทุกคำสั่งที่รัน · ทุก run</span>
+  </div>
+  <p class="note">สามเส้นทางนี้คือที่มาของ gate ส่วนใหญ่ในสเปก — ถ้าเส้นใดเส้นหนึ่งผิด คุณภาพหรือความปลอดภัยจะพังทันที</p>
+
+  <div class="flow">
+    <div class="flow__head">
+      <h3>C1 · Per-request context pipeline</h3>
+      <span class="tag">spec §6 — รันก่อน <b>ทุก</b> provider request</span>
+      <p class="th">รวมถึง request ซอยย่อยภายใน Pi run เดียว — ไม่ใช่แค่ตอนขึ้น turn ใหม่</p>
+    </div>
+    <div class="stepper stepper--6">
+      <div class="step"><span class="n">1</span><h4>Load</h4><p>โหลด intent, instructions ที่ใช้ได้ และ tool-protocol obligation ที่ค้างอยู่</p></div>
+      <div class="step"><span class="n">2</span><h4>Validate</h4><p>ตรวจ hash ของ candidate source และความสดของ cached evidence</p></div>
+      <div class="step"><span class="n">3</span><h4>Merge</h4><p>รวม context ใหม่กับ retained history, dedupe, ระบุเวอร์ชันที่ถูกแทนที่แล้ว</p></div>
+      <div class="step"><span class="n">4</span><h4>Rank &amp; budget</h4><p>จัดอันดับ deterministic แล้วใช้งบ — ถ้าไม่พอจริงให้ pause ไม่ใช่ตัดเงียบ</p></div>
+      <div class="step"><span class="n">5</span><h4>Validate shape</h4><p>ตรวจลำดับเวลา, การจับคู่ tool-call/result และข้อจำกัดของ provider</p></div>
+      <div class="step"><span class="n">6</span><h4>Manifest &amp; dispatch</h4><p>บันทึก request manifest แล้วส่ง view ที่ผ่านการตรวจผ่าน kernel</p></div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow__head">
+      <h3>C2 · Tool execution lifecycle</h3>
+      <span class="tag">spec §17, §33–34, §38</span>
+      <p class="th">journal intent ก่อน launch เสมอ — crash ระหว่างทางจึงกลายเป็น unknown ไม่ใช่การเดาว่าสำเร็จ</p>
+    </div>
+    <div class="stepper stepper--5">
+      <div class="step"><span class="n">1</span><h4>Authorize</h4><p>ขออนุมัติ command · นอกขอบเขตหรือ noninteractive → fail closed</p></div>
+      <div class="step"><span class="n">2</span><h4>Journal</h4><p>commit <code>prepared</code> ก่อน launch: execution id, Pi tool-call id, input ที่ redact แล้ว, precondition</p></div>
+      <div class="step"><span class="n">3</span><h4>Capture</h4><p>spawn ด้วย environment allowlist แล้ว stream output แบบ bounded ลง disk</p></div>
+      <div class="step"><span class="n">4</span><h4>Settle</h4><p>completed / failed / cancelled / unknown — cancellation ยิงถึง process group พร้อม grace 2 วินาที</p></div>
+      <div class="step"><span class="n">5</span><h4>Evidence → invalidate</h4><p>บันทึก evidence พร้อม snapshot digest · การแก้ไฟล์ที่เกี่ยวข้องภายหลังทำให้ evidence เก่าใช้ไม่ได้</p></div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow__head">
+      <h3>C3 · Run lifecycle, compaction &amp; recovery</h3>
+      <span class="tag">spec §5.2, §20–21, §35, §38</span>
+      <p class="th">Harness เป็นเจ้าของ "จะไปต่อหรือหยุด" ส่วน Pi เป็นเจ้าของ inner model/tool loop</p>
+    </div>
+    <div class="cards cards--3">
+      <article class="card">
+        <h4>Workflow</h4>
+        <p>understand → discover → plan → implement → test → inspect/fix → review → finish · re-plan เฉพาะเมื่อ task เปลี่ยน, เจอ blocker ใหญ่ หรือสมมติฐานแรกผิด</p>
+      </article>
+      <article class="card">
+        <h4>Stop / pause conditions</h4>
+        <p>งานเสร็จ · blocker · policy denial · user cancellation · failure ซ้ำโดยไม่มีความคืบหน้า · ถึงเพดานที่ตั้งไว้ · "ห้ามไปต่อ run ที่ถูกยกเลิกอัตโนมัติ"</p>
+      </article>
+      <article class="card">
+        <h4>Compaction (Macus คุมเอง)</h4>
+        <p>ถึง safe tool boundary → commit task/ledger state → checkpoint → สั่ง Pi compact → validate + rebuild effective view → ไปต่อเฉพาะเมื่อ invariant ยังจริง · serialize กับการ dispatch</p>
+      </article>
+      <article class="card">
+        <h4>Recovery order</h4>
+        <p>ยึด mutation lock → ตรวจ identity ของ repo/worktree/session → โหลด transcript + state revision → reconcile journal กับหลักฐานจริง → แก้ incomplete tool exchange ผ่าน adapter ที่รองรับ (ถ้าไม่ได้ → pause ไม่แก้ไฟล์ Pi) → revalidate hash/evidence → resume เฉพาะงานที่ได้รับอนุญาต</p>
+      </article>
+      <article class="card">
+        <h4>กติกาที่ทำให้ recovery ซื่อสัตย์</h4>
+        <p>"ห้ามสมมติว่าคำตอบที่หายไปแปลว่าคำสั่งไม่ได้รัน" · ผลลัพธ์ที่สำเร็จแล้ว restore ได้ครั้งเดียว · ผลที่ไม่ชัดเจนยังเป็น <code>unknown</code></p>
+      </article>
+      <article class="card">
+        <h4>Checkpoint ที่ไม่หลอกตัวเอง</h4>
+        <p>atomic write + rename + register ใน state.db · "ห้ามถือว่า checkpoint ที่ไม่สมบูรณ์คือ committed" · restore ทำให้ evidence เก่า invalid แต่ไม่ revert โค้ด</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PANEL D : HARNESS ENGINEERING ================= -->
+<section id="harness">
+  <div class="panel-head">
+    <span class="panel-num">D</span>
+    <h2>Harness Engineering</h2>
+    <span class="sub">spec §39, §45 · handoff §14</span>
+  </div>
+  <p class="note">
+    คำว่า “harness” ในโปรเจกต์นี้มี <b>สองความหมาย</b> และทั้งคู่คือหัวใจของงานวิศวกรรม:
+    (1) <b>Agent Harness</b> = ชั้นควบคุม run/workflow แบบ durable ใน panel B–C
+    และ (2) <b>Benchmark Harness</b> = เครื่องมือวัดผลแบบ paired ที่ต้องพิสูจน์ว่าการลด context ไม่ทำลายคุณภาพ
+  </p>
+
+  <div class="flow">
+    <div class="flow__head">
+      <h3>D1 · Paired measurement harness</h3>
+      <span class="tag">workflow/benchmark.ts · runPairedBenchmark()</span>
+      <p class="th">Macus กับ Pi เวอร์ชันดิบถูกวัดบนเงื่อนไขเดียวกัน แล้วสลับลำดับเพื่อตัดอคติของ cache/เวลา</p>
+    </div>
+    <div class="stepper stepper--6">
+      <div class="step"><span class="n">1</span><h4>Same inputs</h4><p>revision เริ่มต้น, prompt, endpoint/version ของโมเดล, generation settings, context/output limits และ test oracle เดียวกัน</p></div>
+      <div class="step"><span class="n">2</span><h4>Reset workspace</h4><p>reset ระหว่าง run ทุกครั้งผ่าน <code>prepareWorkspace</code> ที่เป็น dependency ชัดเจน</p></div>
+      <div class="step"><span class="n">3</span><h4>≥3 repetitions</h4><p>อย่างน้อย 3 คู่ต่อ task/condition · safety bound 2,000 runs ต่อแผน</p></div>
+      <div class="step"><span class="n">4</span><h4>Alternate order</h4><p>repetition คู่ → <code>unmodified_pi</code> ก่อน; คี่ → <code>macus</code> ก่อน (สลับจริงในโค้ด)</p></div>
+      <div class="step"><span class="n">5</span><h4>Label cache</h4><p>แยก repository cache และ provider cache เป็น cold / warm / unknown — ที่ควบคุมไม่ได้ต้องเป็น <code>unknown</code></p></div>
+      <div class="step"><span class="n">6</span><h4>Correctness first</h4><p>วัด task success ก่อน แล้วจึง tokens ทั้งหมด (รวม summary/retry/compaction), wall time, first useful edit, peak context, CLI memory</p></div>
+    </div>
+  </div>
+
+  <div class="cards cards--3" style="margin-bottom:18px">
+    <article class="card">
+      <h4>Quality gate</h4>
+      <p>ต้อง "ไม่มี test case ของ correctness/recovery ที่พังเพิ่มขึ้น" เทียบ baseline — เป็น regression gate ไม่ใช่หลักฐานทางสถิติว่าเทียบเท่า</p>
+      <span class="ref">ห้ามอ้าง token/latency ดีขึ้นนอกเงื่อนไขที่วัด</span>
+    </article>
+    <article class="card">
+      <h4>Reference fixture</h4>
+      <p>ชุดทดสอบผสม TS/JS/C# ขนาด 10,000 ไฟล์ ~100 MiB พร้อม SHA-256 manifest และรายการ exclusion ที่ deterministic</p>
+      <span class="ref">workflow/benchmark-fixture.ts</span>
+    </article>
+    <article class="card">
+      <h4>Metric distributions</h4>
+      <p>เก็บ raw run data และกระจายค่าต่อ task × condition × system ไม่ใช่ค่าเฉลี่ยค่าเดียวที่ซ่อนความแปรปรวน</p>
+      <span class="ref">โดยเก็บ cost เฉพาะเมื่อมีแหล่งราคาชัดเจน</span>
+    </article>
+  </div>
+
+  <div class="flow">
+    <div class="flow__head">
+      <h3>D2 · Evidence &amp; phase gates</h3>
+      <span class="tag">spec §45 — ตาราง phase คือสัญญา</span>
+      <p class="th">เจ็ด phase แต่ละอันมี gate ของตัวเอง และทุก phase ปิดได้เฉพาะเมื่อมีหลักฐานที่ทำซ้ำได้</p>
+    </div>
+    <div class="cards cards--4">
+      <article class="card"><h4>1 · Agent foundation &amp; safety</h4><p>ทุก adapter hook ถูกพิสูจน์ · ทุก request อยู่ใน budget · cancel ถึงจริง · crash หลังเขียนไม่ replay</p></article>
+      <article class="card"><h4>2 · Retrieval &amp; freshness</h4><p>symbol กำกวมต้อง explicit · ไฟล์ถูกแก้/ลบ/เปลี่ยนชื่อต้อง refresh · hash เก่าห้าม drive edit</p></article>
+      <article class="card"><h4>3 · Context runtime</h4><p>request ที่ส่งจริงตรงกับ manifest · อ่านซ้ำไม่ทำ source ซ้ำ · สลับไปโมเดลเล็กยังอยู่ใน budget</p></article>
+      <article class="card"><h4>4 · Workflow &amp; evidence</h4><p>task รอดจาก resume · ผล partial/unknown/timeout/ไม่มี test ห้ามผ่าน · loop caps ทำงาน</p></article>
+      <article class="card"><h4>5 · Durable context</h4><p>goal/constraint/tool obligation รอดจาก compaction · failure ยังกู้คืนได้ · restore ทำให้ evidence เก่า invalid โดยไม่ revert โค้ด</p></article>
+      <article class="card"><h4>6 · Relationships</h4><p>ชื่อซ้ำ/alias/overload/dynamic call ห้ามให้ความมั่นใจเท็จ · graph ปิดแล้ว search/workflow ยังทำงาน</p></article>
+      <article class="card"><h4>7 · Release hardening</h4><p>gate ก่อนหน้าทั้งหมดยังเขียว · ติดตั้งสะอาด · recovery interruption matrix ผ่านหรือ pause อย่างชัดเจน · เผยแพร่ metrics/ข้อจำกัด</p></article>
+      <article class="card"><h4>Common gate ทุก phase</h4><p>CLI ทำงาน · test/typecheck/build ผ่าน · lint ถ้ามี config · docs อัปเดต · diff ถูก review · ไม่มี unrelated change · เขียน <code>docs/phase-N-evidence.md</code></p></article>
+    </div>
+
+    <div class="callout">
+      <h4>กฎของการรายงานผล (ห้ามละเมิด)</h4>
+      <ul>
+        <li>คำสั่งที่ fail หรือ required test ที่ไม่ได้รัน <b>ปิด phase ไม่ได้</b> — "no placeholder success statements"</li>
+        <li>ผลรวมของ search ที่ไม่รู้จำนวนต้องเป็น nullable — "ห้ามอ้าง total ที่แน่นอนถ้าไม่ได้นับจริง"</li>
+        <li>ความเชื่อมั่นเป็นเพียง evidence/ranking hint <b>ไม่ใช่ probability ที่ calibrate แล้ว</b></li>
+        <li>ตัวเลข performance ทั้งหมดเป็น <b>target ที่ต้องวัด</b> ไม่ใช่ผลที่ได้แล้ว (startup p95 &lt; 2 s, search p95 ≤ 500 ms, symbol read p95 ≤ 200 ms, index refresh ไฟล์ ≤ 100 KiB p95 ≤ 1 s, idle CPU &lt; 1%, peak RSS ≤ 512 MiB)</li>
+        <li>ถ้าวัดบนเครื่องอื่น ต้องรายงานแยกหรือ rebaseline ด้วยหลักฐาน — "ห้ามผ่อนเป้าหมายเงียบ ๆ"</li>
+        <li>mock provider พิสูจน์ได้แค่พฤติกรรมในเครื่อง ไม่ใช่ compatibility กับ provider จริง</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PANEL E : MODULE MAP ================= -->
+<section id="modules">
+  <div class="panel-head">
+    <span class="panel-num">E</span>
+    <h2>Module Map &amp; Current State</h2>
+    <span class="sub">เทียบกับ docs/implementation-map.md และหลักฐาน phase</span>
+  </div>
+  <p class="note">
+    สถานะด้านล่างสะท้อนสิ่งที่ <b>มีหลักฐานยืนยัน</b> ในรีโป ณ commit นี้ — "gate open" ไม่ได้แปลว่าโค้ดไม่มี
+    แต่แปลว่ายังไม่มีหลักฐานครบตามเกณฑ์ของ phase นั้น
+  </p>
+
+  <table>
+    <caption>Logical modules ทั้งหมดอยู่ใน TypeScript package เดียว — การแยก physical package เป็นเรื่องที่ยังไม่จำเป็น (spec §4)</caption>
+    <thead>
+      <tr><th style="width:20%">Product area</th><th style="width:34%">Boundary (ไฟล์จริง)</th><th style="width:34%">สิ่งที่ทำได้แล้ว</th><th style="width:12%">Gate</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>CLI &amp; Pi adapter</td>
+        <td class="mod">src/cli.ts · src/kernel/pi-agent-kernel.ts</td>
+        <td>Bootstrap CLI, session loop, adapter capability assertion, extension hook</td>
+        <td><span class="pill p-open">open</span></td>
+      </tr>
+      <tr>
+        <td>Model trust &amp; configuration</td>
+        <td class="mod">src/config/trusted-model.ts</td>
+        <td>Global schema validation, trusted alias, project feature narrowing, <code>/models</code>, <code>/model</code>, secret-free <code>/settings</code></td>
+        <td><span class="pill p-open">open</span></td>
+      </tr>
+      <tr>
+        <td>Policy, execution, output bounds</td>
+        <td class="mod">src/execution/policy-executor.ts · pi-shell-tool.ts · execution-log-store.ts</td>
+        <td>Approval-gated shell tool, durable journal, timeouts, env allowlist, memory/spool/retention caps, bounded <code>read_log</code></td>
+        <td><span class="pill p-open">open</span></td>
+      </tr>
+      <tr>
+        <td>Durable state &amp; recovery</td>
+        <td class="mod">src/state/state-store.ts · workflow/checkpoints.ts · recovery-report.ts</td>
+        <td>SQLite session identity, migrations, duplicate replay refusal, fsync+rename checkpoints, startup reconciliation, <code>/recovery</code></td>
+        <td><span class="pill p-open">open</span></td>
+      </tr>
+      <tr>
+        <td>Retrieval &amp; freshness</td>
+        <td class="mod">src/retrieval/*.ts · execution/repository-tools.ts</td>
+        <td>Bounded search, query-bound cursors, policy-filtered reads, hash-checked edits, syntax index + cache quarantine</td>
+        <td><span class="pill p-partial">partial</span></td>
+      </tr>
+      <tr>
+        <td>Instruction &amp; request context</td>
+        <td class="mod">src/context/*.ts · kernel/pi-agent-kernel.ts</td>
+        <td>Request hook ที่ฉีด working set สด, แทนที่ source ที่ถูก supersede, บันทึก provenance/omission/manifest, บังคับเพดานก่อน dispatch</td>
+        <td><span class="pill p-partial">partial</span></td>
+      </tr>
+      <tr>
+        <td>Tasks, Git, test evidence, review</td>
+        <td class="mod">src/workflow/git-*.ts · run-controller.ts · test-evidence.ts · review-report.ts</td>
+        <td>Durable tasks + transitions, evidence ผูกกับ task, blocker resolution, run caps, hash attribution, evidence-backed <code>/review</code></td>
+        <td><span class="pill p-partial">partial</span></td>
+      </tr>
+      <tr>
+        <td>Relationship graph</td>
+        <td class="mod">src/retrieval/relationship-graph.ts</td>
+        <td>Generation-keyed containment, resolved static imports, TS <code>implements</code>, lexical reference candidates, 4 query tools</td>
+        <td><span class="pill p-partial">partial</span></td>
+      </tr>
+      <tr>
+        <td>Benchmarks &amp; release validation</td>
+        <td class="mod">src/workflow/benchmark*.ts · pi-baseline.ts · macus-baseline.ts</td>
+        <td>Harness + fixture generator + adapters มีอยู่จริง แต่ยังไม่มีการวัดแบบ controlled</td>
+        <td><span class="pill p-open">open</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout" style="border-color:#f8e0bb; background:#fdf8f0">
+    <h4 style="color:var(--amber)">สถานะที่ยังเปิดอยู่ (ต้องพูดตรง ๆ)</h4>
+    <ul>
+      <li>Phase 7 ระบุชัดว่า <code>Status: not passed; release audit remains incomplete</code> และ gate 1–6 ยังไม่เขียวพร้อมกัน</li>
+      <li>ยังไม่มี live provider endpoint ที่ได้รับอนุญาต → ไม่มีการอ้าง live compatibility</li>
+      <li>ยังไม่มีตัวเลข paired Macus-vs-Pi ที่ควบคุมได้ → ไม่มีการอ้างว่า token/latency ดีขึ้น</li>
+      <li>ยังไม่มี hosted CI run เป็นหลักฐาน และการตรวจ license/attribution ของ dependency ยังไม่ครบ</li>
+      <li>ที่ยืนยันแล้วบนเครื่องนี้: <code>npm test</code> ผ่าน 153 tests, typecheck, build, packaged CLI smoke (macOS arm64 + Linux arm64) และ fixture generator ผลิต 10,000 ไฟล์ / 104,857,600 bytes พร้อม deterministic manifest</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  สร้างจาก <code>docs/spec.md</code> (§3, §4, §6, §17, §20–21, §32–35, §38–39, §45) ·
+  <code>docs/handoff.md</code> (§1, §4–5, §14) · <code>docs/implementation-map.md</code> ·
+  <code>docs/phase-7-evidence.md</code> · และโครงสร้างจริงใน <code>src/</code> ณ commit <code>3fe8517</code>.
+  เอกสารนี้เป็นแผนที่สถาปัตยกรรม ไม่ใช่หลักฐานว่าผ่าน gate — หลักฐานอยู่ที่ <code>docs/phase-N-evidence.md</code>
+</footer>
+
+</div>
+</body>
+</html>
