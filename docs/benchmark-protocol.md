@@ -1,6 +1,12 @@
 # Paired Benchmark Protocol
 
 `src/workflow/benchmark.ts` provides a runner-independent harness.
+`npm run benchmark:fixture -- /path/to/empty-directory` generates the pinned
+10,000-file, 100 MiB corpus (4,000 TypeScript, 3,000 JavaScript, 3,000 C#); its
+per-file hashes and exact manifest are stored under
+`.macus/benchmark/fixture-v1.json`, excluded from the corpus. The generator
+refuses non-empty output directories and supports smaller explicit sizes in
+tests.
 `src/workflow/pi-baseline.ts` provides a partial in-process adapter around the
 pinned Pi SDK session, with the already-trusted model selection, explicit
 built-in tool allowlist, and caller-supplied test/recovery oracles.
