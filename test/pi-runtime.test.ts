@@ -9,6 +9,7 @@ import { after, describe, it } from "node:test";
 import type { TrustedModelSelection } from "../src/config/trusted-model.js";
 import { createRequestBudgetGuard } from "../src/context/request-budget.js";
 import { assertPiSessionCapabilities, PiAgentKernel } from "../src/kernel/pi-agent-kernel.js";
+import { gatewayHeadersFor } from "../src/kernel/trusted-pi-model.js";
 import { openStateStore } from "../src/state/state-store.js";
 import { createDurableCheckpoint, reconcileDurableCheckpoints } from "../src/workflow/checkpoints.js";
 
@@ -217,6 +218,15 @@ function selection(baseUrl: string, budgets: Pick<TrustedModelSelection, "contex
 }
 
 describe("Pi adapter with a deterministic local provider", () => {
+  it("adds gateway routing headers only for the OpenCode Go gateway", () => {
+    const goHeaders = gatewayHeadersFor("https://opencode.ai/zen/go/v1", () => "fixed-session");
+    assert.deepEqual(goHeaders, { "user-agent": "macus/0.1.0", "x-opencode-session": "fixed-session" });
+    assert.equal(gatewayHeadersFor("https://opencode.ai/zen/v1", () => "x"), undefined);
+    assert.equal(gatewayHeadersFor("http://opencode.ai/zen/go/v1", () => "x"), undefined, "plain-HTTP gateways stay unmodified");
+    assert.equal(gatewayHeadersFor("https://example.com/v1", () => "x"), undefined);
+    assert.equal(gatewayHeadersFor("not a url", () => "x"), undefined);
+  });
+
   it("fails with an actionable compatibility error when a required public Pi capability is absent", () => {
     assert.throws(
       () => assertPiSessionCapabilities({ prompt: () => undefined } as never),
