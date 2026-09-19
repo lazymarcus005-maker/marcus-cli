@@ -729,6 +729,42 @@ describe("Pi adapter with a deterministic local provider", () => {
     }
   });
 
+  it("refuses a source write and preserves the file when the user denies authorization", async () => {
+    const root = await mkdtemp(join(tmpdir(), "macus-pi-write-denied-"));
+    roots.push(root);
+    const original = "export const value = 'untouched';\n";
+    const sourcePath = join(root, "source.ts");
+    await writeFile(sourcePath, original);
+    const expectedSha256 = createHash("sha256").update(original).digest("hex");
+    const provider = await localProvider([
+      functionToolCompletion("read_range", { path: "source.ts", startLine: 1, endLine: 1 }),
+      functionToolCompletion("write_file", { path: "source.ts", expectedSha256, content: "export const value = 'overwritten';\n" }),
+      completion("The denial is acknowledged; no file was changed."),
+    ]);
+    const store = openStateStore(join(root, ".macus", "state", "state.db"));
+    const kernel = new PiAgentKernel(
+      root,
+      selection(provider.baseUrl, { contextWindow: 16_384, reservedOutputTokens: 256, safetyMarginTokens: 256 }),
+      undefined,
+      store,
+      async () => false,
+    );
+    try {
+      await kernel.start();
+      store.createSession({ sessionId: kernel.sessionId!, worktreeRoot: root, gitDirectory: null });
+      await kernel.prompt("Read the file and try to replace it.");
+      assert.equal(await readFile(sourcePath, "utf8"), original, "a denied write must not modify the file");
+      assert.match(provider.bodies()[2] ?? "", /"content":"File write denied by user"/, "the follow-up request must observe the denial as a tool error");
+      assert.doesNotMatch(provider.bodies()[2] ?? "", /Updated source\.ts/, "a denied write must never report an applied source change");
+      assert.deepEqual(store.listSourceChanges(kernel.sessionId!), [], "a denied write must not be recorded as an agent source change");
+      assert.deepEqual(store.listUnresolvedExecutions(kernel.sessionId!), [], "a denial before launch leaves no unresolved execution");
+      assert.equal(store.listExecutionIds(kernel.sessionId!).length, 1, "only the journaled read exists; the denied write is never journaled");
+    } finally {
+      await kernel.dispose();
+      store.close();
+    }
+  });
+
   it("propagates session cancellation to the active provider stream", async () => {
     const root = await mkdtemp(join(tmpdir(), "macus-pi-cancel-"));
     roots.push(root);
