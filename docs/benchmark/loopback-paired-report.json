@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "c8e641ba-fbec-4a82-9bb4-ac8fef737d30",
+  "createdAt": "2026-09-19T16:12:49.570Z",
+  "runtime": "paired-loopback/v24.21.0",
+  "repetitions": 3,
+  "conditions": [
+    {
+      "repositoryCache": "cold",
+      "providerCache": "unknown"
+    }
+  ],
+  "correctnessFirst": {
+    "pairedComparisons": 3,
+    "regressions": [],
+    "unknownComparisons": [],
+    "status": "no-regression-observed"
+  },
+  "rawRuns": [
+    {
+      "taskId": "loopback-bash-append-edit",
+      "prompt": "Append the benchmark marker comment to app.ts using the shell, then confirm the edit.",
+      "startingRevision": "75a75cae9ad8994b5c3eb26321add823e4b6d924",
+      "testOracle": "git status must show only app.ts modified and app.ts must contain the benchmark marker",
+      "endpointModel": "benchmark-fixture/fixture-model",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 16384,
+      "outputLimitTokens": 256,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "8e34d218-4144-4f46-987c-1aba70fc868d",
+      "pairId": "646cb855-fe26-402f-9db2-52c94635054e",
+      "system": "unmodified_pi",
+      "runOrder": 0,
+      "repetition": 0,
+      "promptSha256": "3663dc666605bf830e454e5871cbd885beb8c8619fe2394bb3590ce24d2c6550",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 41,
+        "outputTokens": 12,
+        "cachedInputTokens": 11,
+        "uncachedInputTokens": 30,
+        "wallTimeMs": 65.65750000000003,
+        "firstUsefulEditMs": null,
+        "toolCalls": 1,
+        "peakContextTokens": 24,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "loopback-bash-append-edit",
+      "prompt": "Append the benchmark marker comment to app.ts using the shell, then confirm the edit.",
+      "startingRevision": "75a75cae9ad8994b5c3eb26321add823e4b6d924",
+      "testOracle": "git status must show only app.ts modified and app.ts must contain the benchmark marker",
+      "endpointModel": "benchmark-fixture/fixture-model",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 16384,
+      "outputLimitTokens": 256,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "24e66cfa-b008-49e1-8010-ec737190e6a7",
+      "pairId": "646cb855-fe26-402f-9db2-52c94635054e",
+      "system": "macus",
+      "runOrder": 1,
+      "repetition": 0,
+      "promptSha256": "3663dc666605bf830e454e5871cbd885beb8c8619fe2394bb3590ce24d2c6550",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 41,
+        "outputTokens": 12,
+        "cachedInputTokens": 11,
+        "uncachedInputTokens": 30,
+        "wallTimeMs": 97.62479100000019,
+        "firstUsefulEditMs": null,
+        "toolCalls": 1,
+        "peakContextTokens": 24,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "loopback-bash-append-edit",
+      "prompt": "Append the benchmark marker comment to app.ts using the shell, then confirm the edit.",
+      "startingRevision": "75a75cae9ad8994b5c3eb26321add823e4b6d924",
+      "testOracle": "git status must show only app.ts modified and app.ts must contain the benchmark marker",
+      "endpointModel": "benchmark-fixture/fixture-model",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 16384,
+      "outputLimitTokens": 256,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "b7098b3e-ad5e-4578-a869-6224eb9e6a5b",
+      "pairId": "00823690-d600-4f2c-bb92-848d7f540635",
+      "system": "macus",
+      "runOrder": 2,
+      "repetition": 1,
+      "promptSha256": "3663dc666605bf830e454e5871cbd885beb8c8619fe2394bb3590ce24d2c6550",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 41,
+        "outputTokens": 12,
+        "cachedInputTokens": 11,
+        "uncachedInputTokens": 30,
+        "wallTimeMs": 83.40516600000001,
+        "firstUsefulEditMs": null,
+        "toolCalls": 1,
+        "peakContextTokens": 24,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "loopback-bash-append-edit",
+      "prompt": "Append the benchmark marker comment to app.ts using the shell, then confirm the edit.",
+      "startingRevision": "75a75cae9ad8994b5c3eb26321add823e4b6d924",
+      "testOracle": "git status must show only app.ts modified and app.ts must contain the benchmark marker",
+      "endpointModel": "benchmark-fixture/fixture-model",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 16384,
+      "outputLimitTokens": 256,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "777040b9-8ace-461a-8e5a-e8c9dc7b0077",
+      "pairId": "00823690-d600-4f2c-bb92-848d7f540635",
+      "system": "unmodified_pi",
+      "runOrder": 3,
+      "repetition": 1,
+      "promptSha256": "3663dc666605bf830e454e5871cbd885beb8c8619fe2394bb3590ce24d2c6550",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 41,
+        "outputTokens": 12,
+        "cachedInputTokens": 11,
+        "uncachedInputTokens": 30,
+        "wallTimeMs": 5.9522920000001704,
+        "firstUsefulEditMs": null,
+        "toolCalls": 1,
+        "peakContextTokens": 24,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "loopback-bash-append-edit",
+      "prompt": "Append the benchmark marker comment to app.ts using the shell, then confirm the edit.",
+      "startingRevision": "75a75cae9ad8994b5c3eb26321add823e4b6d924",
+      "testOracle": "git status must show only app.ts modified and app.ts must contain the benchmark marker",
+      "endpointModel": "benchmark-fixture/fixture-model",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 16384,
+      "outputLimitTokens": 256,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "af878e9b-ca79-4541-8eb1-b53a64bed3bf",
+      "pairId": "d5ba7760-c649-4a0d-a032-bf6189b1959b",
+      "system": "unmodified_pi",
+      "runOrder": 4,
+      "repetition": 2,
+      "promptSha256": "3663dc666605bf830e454e5871cbd885beb8c8619fe2394bb3590ce24d2c6550",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 41,
+        "outputTokens": 12,
+        "cachedInputTokens": 11,
+        "uncachedInputTokens": 30,
+        "wallTimeMs": 10.800917000000027,
+        "firstUsefulEditMs": null,
+        "toolCalls": 1,
+        "peakContextTokens": 24,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    },
+    {
+      "taskId": "loopback-bash-append-edit",
+      "prompt": "Append the benchmark marker comment to app.ts using the shell, then confirm the edit.",
+      "startingRevision": "75a75cae9ad8994b5c3eb26321add823e4b6d924",
+      "testOracle": "git status must show only app.ts modified and app.ts must contain the benchmark marker",
+      "endpointModel": "benchmark-fixture/fixture-model",
+      "generationSettings": {
+        "temperature": 0
+      },
+      "contextLimitTokens": 16384,
+      "outputLimitTokens": 256,
+      "repositoryCache": "cold",
+      "providerCache": "unknown",
+      "runId": "716d1b99-cd8a-4d3c-9632-0b55cf2556a3",
+      "pairId": "d5ba7760-c649-4a0d-a032-bf6189b1959b",
+      "system": "macus",
+      "runOrder": 5,
+      "repetition": 2,
+      "promptSha256": "3663dc666605bf830e454e5871cbd885beb8c8619fe2394bb3590ce24d2c6550",
+      "observation": {
+        "testStatus": "passed",
+        "inputTokens": 41,
+        "outputTokens": 12,
+        "cachedInputTokens": 11,
+        "uncachedInputTokens": 30,
+        "wallTimeMs": 91.14175,
+        "firstUsefulEditMs": null,
+        "toolCalls": 1,
+        "peakContextTokens": 24,
+        "cliPeakRssBytes": null,
+        "recoveryPassed": true,
+        "limitation": "In-process adapter does not measure isolated CLI RSS or first useful edit time."
+      }
+    }
+  ],
+  "metricDistributions": {
+    "unmodified_pi": {
+      "loopback-bash-append-edit": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 3,
+            "median": 41,
+            "p95": 41
+          },
+          "outputTokens": {
+            "count": 3,
+            "median": 12,
+            "p95": 12
+          },
+          "cachedInputTokens": {
+            "count": 3,
+            "median": 11,
+            "p95": 11
+          },
+          "uncachedInputTokens": {
+            "count": 3,
+            "median": 30,
+            "p95": 30
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 10.800917000000027,
+            "p95": 65.65750000000003
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 1,
+            "p95": 1
+          },
+          "peakContextTokens": {
+            "count": 3,
+            "median": 24,
+            "p95": 24
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      }
+    },
+    "macus": {
+      "loopback-bash-append-edit": {
+        "repositoryCache=cold;providerCache=unknown": {
+          "inputTokens": {
+            "count": 3,
+            "median": 41,
+            "p95": 41
+          },
+          "outputTokens": {
+            "count": 3,
+            "median": 12,
+            "p95": 12
+          },
+          "cachedInputTokens": {
+            "count": 3,
+            "median": 11,
+            "p95": 11
+          },
+          "uncachedInputTokens": {
+            "count": 3,
+            "median": 30,
+            "p95": 30
+          },
+          "wallTimeMs": {
+            "count": 3,
+            "median": 91.14175,
+            "p95": 97.62479100000019
+          },
+          "firstUsefulEditMs": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          },
+          "toolCalls": {
+            "count": 3,
+            "median": 1,
+            "p95": 1
+          },
+          "peakContextTokens": {
+            "count": 3,
+            "median": 24,
+            "p95": 24
+          },
+          "cliPeakRssBytes": {
+            "count": 0,
+            "median": null,
+            "p95": null
+          }
+        }
+      }
+    }
+  },
+  "claims": [
+    "No performance or equivalence claim is implied by this report.",
+    "Cost is omitted unless an explicit pricing source and configuration are supplied."
+  ]
+}
