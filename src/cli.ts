@@ -14,6 +14,7 @@ import {
   openStateStore,
 } from "./state/state-store.js";
 import { PiAgentKernel, type KernelObservation } from "./kernel/pi-agent-kernel.js";
+import { SessionApprovals } from "./cli-approvals.js";
 import { searchCode } from "./retrieval/search.js";
 import { buildRepositoryMap } from "./retrieval/repo-map.js";
 import { buildSymbolIndex, searchSymbols } from "./retrieval/symbol-index.js";
@@ -29,7 +30,7 @@ import type { ExecutionAuthorization } from "./execution/policy-executor.js";
 export interface CliDependencies {
   version?: string;
   write: (text: string) => void;
-  startSession: (initialPrompt?: string) => Promise<void>;
+  startSession: (initialPrompt?: string, initialYolo?: boolean) => Promise<void>;
 }
 
 const helpText = `Macus Code — local CLI coding agent
@@ -39,9 +40,11 @@ Usage: macus [task]
 Options:
   -h, --help      Show this help
   -v, --version   Show version
+  --yolo          Auto-approve model-requested commands (credentials stay blocked)
 
 Session commands:
   /help           Show this help
+  /yolo           Toggle auto-approval of model-requested commands
   /status         Show selected model and request limits
   /recovery       Inspect redacted details for unresolved executions and runs
   /models         List trusted model aliases
@@ -84,12 +87,14 @@ export async function runCli(
     return 0;
   }
 
-  const prompt = args.length > 0 ? args.join(" ") : undefined;
-  await dependencies.startSession(prompt);
+  const yolo = args.includes("--yolo");
+  const promptArgs = args.filter((argument) => argument !== "--yolo");
+  const prompt = promptArgs.length > 0 ? promptArgs.join(" ") : undefined;
+  await dependencies.startSession(prompt, yolo);
   return 0;
 }
 
-async function startInteractiveSession(initialPrompt?: string): Promise<void> {
+async function startInteractiveSession(initialPrompt?: string, initialYolo = false): Promise<void> {
   const cwd = await realpath(process.cwd());
   const globalConfigPath =
     process.env.MACUS_CONFIG ?? join(homedir(), ".macus", "config.yaml");
@@ -116,32 +121,40 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
   const onInterrupt = (): void => {
     void kernel?.cancel();
   };
+  const approvals = new SessionApprovals();
+  approvals.setYolo(initialYolo);
   const authorizeCommand = async (command: string, credentialEnvironmentNames: readonly string[], signal?: AbortSignal): Promise<ExecutionAuthorization> => {
-    console.error("\nApproval required for a model-requested operation.");
-    console.error("Shell commands run locally with your account's permissions; Macus does not OS-sandbox them.");
-    console.error("Review the exact operation and repository scripts before approving:");
-    console.error(command);
-    try {
-      const question = "Type 'yes' to approve this command (anything else denies): ";
-      const answer = signal
-        ? await input!.question(question, { signal })
-        : await input!.question(question);
-      if (answer.trim() !== "yes") return false;
-      if (credentialEnvironmentNames.length === 0) return true;
-      console.error(`Trusted provider credentials are blocked by default. Effective non-secret environment allowlist: ${selection.execution.environmentAllowlist.join(", ") || "(empty)"}.`);
-      console.error(`Credential variable names (values are never displayed): ${credentialEnvironmentNames.join(", ")}`);
-      const credentialAnswer = signal
-        ? await input!.question("For this command only, enter exact credential variable names to pass, comma-separated (Enter keeps all blocked): ", { signal })
-        : await input!.question("For this command only, enter exact credential variable names to pass, comma-separated (Enter keeps all blocked): ");
-      const requested = credentialAnswer.split(",").map((name) => name.trim()).filter(Boolean);
-      if (requested.some((name) => !credentialEnvironmentNames.includes(name))) {
-        console.error("Unknown credential variable name; command denied.");
-        return false;
+    const decision = await approvals.authorize({ command, credentialEnvironmentNames }, async () => {
+      console.error("\nApproval required for a model-requested operation.");
+      console.error("Shell commands run locally with your account's permissions; Macus does not OS-sandbox them.");
+      console.error("Review the exact operation and repository scripts before approving:");
+      console.error(command);
+      try {
+        const question = "Type 'yes' to approve this command (anything else denies): ";
+        const answer = signal
+          ? await input!.question(question, { signal })
+          : await input!.question(question);
+        if (answer.trim() !== "yes") return { approved: false, authorizedEnvironmentNames: [] };
+        if (credentialEnvironmentNames.length === 0) return { approved: true, authorizedEnvironmentNames: [] };
+        console.error(`Trusted provider credentials are blocked by default. Effective non-secret environment allowlist: ${selection.execution.environmentAllowlist.join(", ") || "(empty)"}.`);
+        console.error(`Credential variable names (values are never displayed): ${credentialEnvironmentNames.join(", ")}`);
+        const credentialQuestion = "For this command only, enter exact credential variable names to pass, comma-separated (Enter keeps all blocked): ";
+        const credentialAnswer = signal
+          ? await input!.question(credentialQuestion, { signal })
+          : await input!.question(credentialQuestion);
+        const requested = credentialAnswer.split(",").map((name) => name.trim()).filter(Boolean);
+        if (requested.some((name) => !credentialEnvironmentNames.includes(name))) {
+          console.error("Unknown credential variable name; command denied.");
+          return { approved: false, authorizedEnvironmentNames: [] };
+        }
+        return { approved: true, authorizedEnvironmentNames: [...new Set(requested)] };
+      } catch {
+        return { approved: false, authorizedEnvironmentNames: [] };
       }
-      return { approved: true, authorizedEnvironmentNames: [...new Set(requested)] };
-    } catch {
-      return false;
-    }
+    });
+    if (!decision.approved) return false;
+    if (decision.auto) stdout.write(dim(`⟡ auto-approved (${decision.reason}): ${command.length > 120 ? `${command.slice(0, 120)}…` : command}\n`));
+    return decision.authorizedEnvironmentNames.length ? { approved: true, authorizedEnvironmentNames: decision.authorizedEnvironmentNames } : true;
   };
   const newKernel = (): PiAgentKernel => new PiAgentKernel(cwd, selection, { onObservation: observeRunStats }, stateStore, authorizeCommand);
   const runPrompt = async (promptText: string): Promise<void> => {
@@ -227,7 +240,8 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
     stdout.write(dim(`  model    ${selection.alias} · ${selection.providerId}/${selection.model} (prompt cap ${promptLimitForModel(selection).toLocaleString("en-US")} tok)\n`));
     stdout.write(dim(`  worktree ${bannerGit.isRepository ? `${bannerGit.branch ?? "detached"} @ ${(bannerGit.head ?? "unborn").slice(0, 7)} · ${bannerGit.changedFiles.length ? `${bannerGit.changedFiles.length} changed` : "clean"}` : "not a git repository"}\n`));
     stdout.write(dim(`  session  ${sessionState}${recoveryBlocked ? " · RECOVERY PAUSED (no replay)" : ""}\n`));
-    stdout.write(dim(`  keys     /help · Ctrl-C cancel · /exit quit\n`));
+    stdout.write(dim(`  keys     /help · Ctrl-C cancel · /yolo auto-approve · /exit quit\n`));
+    if (approvals.yolo) stdout.write(dim(`  mode     ⚠ YOLO auto-approve (credentials stay blocked)\n`));
     flushStartupNotices();
     const initialBlockers = stateStore.listActiveBlockers(kernel.sessionId!);
     const initialBlockedTasks = stateStore.listTasks(kernel.sessionId!).filter((task) => task.status === "blocked");
@@ -570,7 +584,13 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
             stdout.write(`${error instanceof Error ? error.message : "Unable to update task"}\n`);
           }
         }
+      } else if (command === "/yolo") {
+        approvals.setYolo(!approvals.yolo);
+        stdout.write(approvals.yolo
+          ? "⚠ YOLO enabled: model-requested commands run without approval (credentials stay blocked; writes still require hash matches). Type /yolo to disable.\n"
+          : "YOLO disabled: commands ask for approval again.\n");
       } else if (command === "/clear") {
+        approvals.reset();
         await kernel.dispose();
         kernel = newKernel();
         await kernel.start();
@@ -579,6 +599,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
         stdout.write(`Started a new session ${kernel.sessionId}; previous sessions and source files were preserved.\n`);
       } else if (command === "/resume" || command.startsWith("/resume ")) {
         const sessionId = command.slice("/resume".length).trim();
+        approvals.reset();
         await kernel.dispose();
         kernel = newKernel();
         await kernel.start(sessionId ? { sessionId } : { resumeRecent: true });
