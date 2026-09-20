@@ -153,10 +153,17 @@ async function startInteractiveSession(initialPrompt?: string, initialYolo = fal
       }
     });
     if (!decision.approved) return false;
-    if (decision.auto) stdout.write(dim(`⟡ auto-approved (${decision.reason}): ${command.length > 120 ? `${command.slice(0, 120)}…` : command}\n`));
+    if (decision.auto) dimLine(`⟡ auto-approved (${decision.reason}): ${command.length > 120 ? `${command.slice(0, 120)}…` : command}`);
     return decision.authorizedEnvironmentNames.length ? { approved: true, authorizedEnvironmentNames: decision.authorizedEnvironmentNames } : true;
   };
-  const newKernel = (): PiAgentKernel => new PiAgentKernel(cwd, selection, { onObservation: observeRunStats }, stateStore, authorizeCommand);
+  const newKernel = (): PiAgentKernel => new PiAgentKernel(cwd, selection, {
+    onObservation: observeRunStats,
+    onTextDelta: (delta) => {
+      if (!delta) return;
+      lastStreamEndedWithNewline = delta.endsWith("\n");
+      stdout.write(delta);
+    },
+  }, stateStore, authorizeCommand);
   const runPrompt = async (promptText: string): Promise<void> => {
     runStats = { toolCalls: 0, inTokens: 0, outTokens: 0 };
     const startedAt = performance.now();
@@ -168,7 +175,7 @@ async function startInteractiveSession(initialPrompt?: string, initialYolo = fal
       stdout.write(`Run failed: ${error instanceof Error ? error.message : "unknown error"}\n`);
     }
     const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
-    stdout.write(dim(`⟡ ${seconds}s · ${runStats.inTokens.toLocaleString("en-US")} tok in · ${runStats.outTokens.toLocaleString("en-US")} tok out · ${runStats.toolCalls} tool call${runStats.toolCalls === 1 ? "" : "s"}${stopped ? " · stopped" : ""}\n`));
+    dimLine(`⟡ ${seconds}s · ${runStats.inTokens.toLocaleString("en-US")} tok in · ${runStats.outTokens.toLocaleString("en-US")} tok out · ${runStats.toolCalls} tool call${runStats.toolCalls === 1 ? "" : "s"}${stopped ? " · stopped" : ""}`);
   };
   let recoveryBlocked = false;
   let repositoryIdentityIssue: string | undefined;
@@ -180,6 +187,11 @@ async function startInteractiveSession(initialPrompt?: string, initialYolo = fal
     while (startupNotices.length) console.error(startupNotices.shift());
   };
   let runStats = { toolCalls: 0, inTokens: 0, outTokens: 0 };
+  let lastStreamEndedWithNewline = true;
+  const dimLine = (text: string): void => {
+    stdout.write(dim(`${lastStreamEndedWithNewline ? "" : "\n"}${text}\n`));
+    lastStreamEndedWithNewline = true;
+  };
   const observeRunStats = (observation: KernelObservation): void => {
     if (observation.type === "tool_call") runStats.toolCalls += 1;
     else {
