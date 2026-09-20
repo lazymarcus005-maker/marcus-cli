@@ -13,7 +13,7 @@ import {
   acquireWorktreeMutationLock,
   openStateStore,
 } from "./state/state-store.js";
-import { PiAgentKernel } from "./kernel/pi-agent-kernel.js";
+import { PiAgentKernel, type KernelObservation } from "./kernel/pi-agent-kernel.js";
 import { searchCode } from "./retrieval/search.js";
 import { buildRepositoryMap } from "./retrieval/repo-map.js";
 import { buildSymbolIndex, searchSymbols } from "./retrieval/symbol-index.js";
@@ -143,9 +143,37 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
       return false;
     }
   };
-  const newKernel = (): PiAgentKernel => new PiAgentKernel(cwd, selection, undefined, stateStore, authorizeCommand);
+  const newKernel = (): PiAgentKernel => new PiAgentKernel(cwd, selection, { onObservation: observeRunStats }, stateStore, authorizeCommand);
+  const runPrompt = async (promptText: string): Promise<void> => {
+    runStats = { toolCalls: 0, inTokens: 0, outTokens: 0 };
+    const startedAt = performance.now();
+    let stopped = false;
+    try {
+      await kernel!.prompt(promptText);
+    } catch (error) {
+      stopped = true;
+      stdout.write(`Run failed: ${error instanceof Error ? error.message : "unknown error"}\n`);
+    }
+    const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
+    stdout.write(dim(`⟡ ${seconds}s · ${runStats.inTokens.toLocaleString("en-US")} tok in · ${runStats.outTokens.toLocaleString("en-US")} tok out · ${runStats.toolCalls} tool call${runStats.toolCalls === 1 ? "" : "s"}${stopped ? " · stopped" : ""}\n`));
+  };
   let recoveryBlocked = false;
   let repositoryIdentityIssue: string | undefined;
+  const interactive = Boolean(stdout.isTTY) && !process.env.NO_COLOR;
+  const dim = (text: string): string => (interactive ? `\x1b[2m${text}\x1b[0m` : text);
+  const startupNotices: string[] = [];
+  const deferNotice = (text: string): void => { startupNotices.push(text); };
+  const flushStartupNotices = (): void => {
+    while (startupNotices.length) console.error(startupNotices.shift());
+  };
+  let runStats = { toolCalls: 0, inTokens: 0, outTokens: 0 };
+  const observeRunStats = (observation: KernelObservation): void => {
+    if (observation.type === "tool_call") runStats.toolCalls += 1;
+    else {
+      runStats.inTokens += observation.usage.input + observation.usage.cacheRead + observation.usage.cacheWrite;
+      runStats.outTokens += observation.usage.output;
+    }
+  };
 
   const registerSessionIdentity = async (verifyRepositoryIdentity = false): Promise<void> => {
     if (!kernel?.sessionId) throw new Error("Pi did not create a session identity");
@@ -166,7 +194,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
       const initialChanges = initialContext.changedFiles.slice(0, 5000).map(({ path }) => ({ path, sha256: currentHashes.get(path) ?? null }));
       stateStore.createSession({ sessionId: kernel.sessionId, worktreeRoot: cwd, gitDirectory, gitBranch: initialContext.branch, gitHead: initialContext.head, gitIdentityCaptured: true }, initialChanges);
       if (initialContext.changedFiles.length > initialChanges.length) {
-        console.error(`Initial source attribution is partial: ${initialChanges.length} of ${initialContext.changedFiles.length} changed paths were recorded.`);
+        deferNotice(`Initial source attribution is partial: ${initialChanges.length} of ${initialContext.changedFiles.length} changed paths were recorded.`);
       }
     }
     stateStore.markInterruptedRunsUnknown(kernel.sessionId);
@@ -175,10 +203,10 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
     const unknownRuns = stateStore.listRuns(kernel.sessionId).filter((run) => run.status === "unknown");
     const unresolved = stateStore.listUnresolvedExecutionDetails(kernel.sessionId);
     recoveryBlocked = unresolved.length > 0 || unknownRuns.length > 0 || repositoryIdentityIssue !== undefined;
-    if (recoveryBlocked) console.error(formatRecoveryReport({ executions: unresolved, unknownRunIds: unknownRuns.map((run) => run.runId), ...(repositoryIdentityIssue ? { repositoryIdentityIssue } : {}) }));
+    if (recoveryBlocked) deferNotice(formatRecoveryReport({ executions: unresolved, unknownRunIds: unknownRuns.map((run) => run.runId), ...(repositoryIdentityIssue ? { repositoryIdentityIssue } : {}) }));
     const checkpoints = await reconcileDurableCheckpoints({ root: cwd, sessionId: kernel.sessionId, stateStore });
     if (checkpoints.removedTemporaryFiles.length || checkpoints.removedOrphanFiles.length || checkpoints.missingRegisteredFiles.length || checkpoints.invalidFiles.length) {
-      console.error(`Checkpoint reconciliation: removed ${checkpoints.removedTemporaryFiles.length} temp and ${checkpoints.removedOrphanFiles.length} orphan file(s); ${checkpoints.missingRegisteredFiles.length} registered file(s) missing; ${checkpoints.invalidFiles.length} invalid file(s). No source files were changed.`);
+      deferNotice(`Checkpoint reconciliation: removed ${checkpoints.removedTemporaryFiles.length} temp and ${checkpoints.removedOrphanFiles.length} orphan file(s); ${checkpoints.missingRegisteredFiles.length} registered file(s) missing; ${checkpoints.invalidFiles.length} invalid file(s). No source files were changed.`);
     }
   };
 
@@ -189,10 +217,18 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
     );
     kernel = newKernel();
     await kernel.start({ resumeRecent: true });
+    const priorSession = Boolean(stateStore.getSession(kernel.sessionId!));
     await registerSessionIdentity(true);
 
     process.on("SIGINT", onInterrupt);
-    console.log("Macus Code — type /exit to quit.");
+    const bannerGit = await readGitContext(cwd);
+    const sessionState = priorSession ? "resumed" : "fresh";
+    stdout.write(dim(`◆ Macus Code v0.1.0 · local coding agent\n`));
+    stdout.write(dim(`  model    ${selection.alias} · ${selection.providerId}/${selection.model} (prompt cap ${promptLimitForModel(selection).toLocaleString("en-US")} tok)\n`));
+    stdout.write(dim(`  worktree ${bannerGit.isRepository ? `${bannerGit.branch ?? "detached"} @ ${(bannerGit.head ?? "unborn").slice(0, 7)} · ${bannerGit.changedFiles.length ? `${bannerGit.changedFiles.length} changed` : "clean"}` : "not a git repository"}\n`));
+    stdout.write(dim(`  session  ${sessionState}${recoveryBlocked ? " · RECOVERY PAUSED (no replay)" : ""}\n`));
+    stdout.write(dim(`  keys     /help · Ctrl-C cancel · /exit quit\n`));
+    flushStartupNotices();
     const initialBlockers = stateStore.listActiveBlockers(kernel.sessionId!);
     const initialBlockedTasks = stateStore.listTasks(kernel.sessionId!).filter((task) => task.status === "blocked");
     if (initialPrompt && recoveryBlocked) {
@@ -200,7 +236,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
     } else if (initialPrompt && (initialBlockers.length || (initialBlockedTasks.length && !stateStore.listTasks(kernel.sessionId!).some((task) => task.status === "in_progress")))) {
       console.error(`Initial task was not sent because the session has unresolved blocker(s). Resolve ledger blockers with /blocker clear REVISION or reopen/start a task explicitly.`);
     } else if (initialPrompt) {
-      await kernel.prompt(initialPrompt);
+      await runPrompt(initialPrompt);
     }
 
     while (true) {
@@ -539,6 +575,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
         kernel = newKernel();
         await kernel.start();
         await registerSessionIdentity();
+        flushStartupNotices();
         stdout.write(`Started a new session ${kernel.sessionId}; previous sessions and source files were preserved.\n`);
       } else if (command === "/resume" || command.startsWith("/resume ")) {
         const sessionId = command.slice("/resume".length).trim();
@@ -546,6 +583,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
         kernel = newKernel();
         await kernel.start(sessionId ? { sessionId } : { resumeRecent: true });
         await registerSessionIdentity(true);
+        flushStartupNotices();
         stdout.write(`Resumed session ${kernel.sessionId}${recoveryBlocked ? " in paused recovery state" : ""}.\n`);
       } else if (/^\/(?:settings|resume|clear|context|checkpoint|map|search|symbol|test|review|goal|decision|next-action|blocker)(?:\s|$)/.test(command)) {
         stdout.write(`Command ${command.split(/\s/, 1)[0]} is not available in this preview yet.\n`);
@@ -558,7 +596,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
           const blockedTasks = tasks.filter((task) => task.status === "blocked");
           if (blockers.length) stdout.write(`Coding prompt paused by blocker(s): ${blockers.map((item) => `revision ${item.revision} (${item.text})`).join("; ")}. Resolve with /blocker clear REVISION.\n`);
           else if (blockedTasks.length && !tasks.some((task) => task.status === "in_progress")) stdout.write(`Coding prompt paused by blocked task(s): ${blockedTasks.map((task) => `${task.id} ${task.title}`).join("; ")}. Use /task reopen ID or /task start ID after resolving the blocker.\n`);
-          else await kernel.prompt(command);
+          else await runPrompt(command);
         }
       }
     }
