@@ -232,9 +232,9 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
     const initialBlockers = stateStore.listActiveBlockers(kernel.sessionId!);
     const initialBlockedTasks = stateStore.listTasks(kernel.sessionId!).filter((task) => task.status === "blocked");
     if (initialPrompt && recoveryBlocked) {
-      console.error("Initial task was not sent because the resumed session has an unresolved execution outcome.");
+      console.error("Initial task was not sent: this resumed session has an unresolved execution outcome. Type /clear to start a fresh session, or /recovery to inspect details.");
     } else if (initialPrompt && (initialBlockers.length || (initialBlockedTasks.length && !stateStore.listTasks(kernel.sessionId!).some((task) => task.status === "in_progress")))) {
-      console.error(`Initial task was not sent because the session has unresolved blocker(s). Resolve ledger blockers with /blocker clear REVISION or reopen/start a task explicitly.`);
+      console.error(`Initial task was not sent: the session has unresolved blocker(s). Type /blocker clear REVISION or /task start ID to resolve, then ask again.`);
     } else if (initialPrompt) {
       await runPrompt(initialPrompt);
     }
@@ -589,7 +589,7 @@ async function startInteractiveSession(initialPrompt?: string): Promise<void> {
         stdout.write(`Command ${command.split(/\s/, 1)[0]} is not available in this preview yet.\n`);
       } else if (command) {
         if (recoveryBlocked) {
-          stdout.write("This session is paused because a prior execution has an unknown outcome. Review it, then use /clear to start safely; Macus will not replay it.\n");
+          stdout.write("⚠ Paused: a prior execution in this session has an unknown outcome; Macus will not replay it. Type /clear to start a fresh session, or /recovery to inspect details.\n");
         } else {
           const blockers = stateStore.listActiveBlockers(kernel.sessionId!);
           const tasks = stateStore.listTasks(kernel.sessionId!);
