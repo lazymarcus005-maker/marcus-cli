@@ -165,6 +165,7 @@ async function startInteractiveSession(initialPrompt?: string, initialYolo = fal
     },
   }, stateStore, authorizeCommand);
   const runPrompt = async (promptText: string): Promise<void> => {
+    stdout.write("\n");
     runStats = { toolCalls: 0, inTokens: 0, outTokens: 0 };
     const startedAt = performance.now();
     let stopped = false;
